@@ -319,50 +319,58 @@ export function StudyPlatform() {
             <div className={`status-pill ${statusTone}`}>{statusText}</div>
           </div>
 
-          <div className="control-grid">
-            <label>
-              <span>学科</span>
-              <select value={subject} onChange={(e) => setSubject(e.target.value)}>
-                {config?.subjects.map((item) => {
-                  const conf = config.curriculum.subjects[item];
-                  return <option key={item} value={item} disabled={!conf.enabled}>{item}{conf.comingSoon ? '（即将上线）' : ''}</option>;
-                })}
-              </select>
-            </label>
-            <label>
-              <span>出题模式</span>
-              <select value={mode} onChange={(e) => setMode(e.target.value as 'regular' | 'common_sense')}>
-                <option value="regular">常规练习</option>
-                <option value="common_sense">生活常识专项</option>
-              </select>
-            </label>
-            <label><span>地区</span><input value={region} onChange={(e) => setRegion(e.target.value)} /></label>
-            <label><span>年级</span><input value={grade} onChange={(e) => setGrade(e.target.value)} /></label>
-            <label><span>教材版本</span><input value={edition} onChange={(e) => setEdition(e.target.value)} /></label>
-            <label>
-              <span>知识点范围</span>
-              <select value={selectedTopics.length === topics.length ? '__all__' : '__multi__'} onChange={(e) => e.target.value === '__all__' ? selectAllTopics() : undefined} disabled={!subjectData?.enabled}>
-                <option value="__multi__">已选 {selectedTopics.length || 0} 个知识点</option>
-                <option value="__all__">所有知识点</option>
-              </select>
-            </label>
-            <label>
-              <span>难度</span>
-              <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
-                <option value="基础">基础</option>
-                <option value="提升">提升</option>
-                <option value="冲刺">冲刺</option>
-              </select>
-            </label>
-            <label>
-              <span>题量</span>
-              <select value={count} onChange={(e) => setCount(e.target.value)}>
-                <option value="3">3 题</option>
-                <option value="5">5 题</option>
-                <option value="8">8 题</option>
-                <option value="15">15 题（整卷风格）</option>
-              </select>
-            </label>
+          <div className="form-section">
+            <div className="section-heading">
+              <h3>第一步：组卷范围</h3>
+              <p>先决定学科、模式，再勾选知识点。</p>
+            </div>
+            <div className="control-grid compact-grid">
+              <label>
+                <span>学科</span>
+                <select value={subject} onChange={(e) => setSubject(e.target.value)}>
+                  {config?.subjects.map((item) => {
+                    const conf = config.curriculum.subjects[item];
+                    return <option key={item} value={item} disabled={!conf.enabled}>{item}{conf.comingSoon ? '（即将上线）' : ''}</option>;
+                  })}
+                </select>
+              </label>
+              <label>
+                <span>出题模式</span>
+                <select value={mode} onChange={(e) => setMode(e.target.value as 'regular' | 'common_sense')}>
+                  <option value="regular">常规练习</option>
+                  <option value="common_sense">生活常识专项</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div className="form-section">
+            <div className="section-heading">
+              <h3>第二步：组卷参数</h3>
+              <p>再设置地区、教材、难度和题量。</p>
+            </div>
+            <div className="control-grid">
+              <label><span>地区</span><input value={region} onChange={(e) => setRegion(e.target.value)} /></label>
+              <label><span>年级</span><input value={grade} onChange={(e) => setGrade(e.target.value)} /></label>
+              <label><span>教材版本</span><input value={edition} onChange={(e) => setEdition(e.target.value)} /></label>
+              <label>
+                <span>难度</span>
+                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                  <option value="基础">基础</option>
+                  <option value="提升">提升</option>
+                  <option value="冲刺">冲刺</option>
+                </select>
+              </label>
+              <label>
+                <span>题量</span>
+                <select value={count} onChange={(e) => setCount(e.target.value)}>
+                  <option value="3">3 题</option>
+                  <option value="5">5 题</option>
+                  <option value="8">8 题</option>
+                  <option value="20">20 题（整卷风格）</option>
+                </select>
+              </label>
+            </div>
           </div>
 
           {!subjectData?.enabled && <div className="subject-status">{subject} 当前为“即将上线”状态，建议先使用物理。</div>}
@@ -371,7 +379,7 @@ export function StudyPlatform() {
             <div className="topic-selector-head">
               <div>
                 <strong>知识点勾选（按模块）</strong>
-                <p className="note">在这里直接选单个、多个，或者全选所有知识点，不再分散到别的位置。</p>
+                <p className="note">已选 {selectedTopics.length} 个知识点{selectedTopics.length === topics.length && topics.length > 0 ? '（当前为所有知识点）' : ''}。</p>
               </div>
               <button type="button" className="text-btn" onClick={selectAllTopics}>全选知识点</button>
             </div>
