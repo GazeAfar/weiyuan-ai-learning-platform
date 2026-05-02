@@ -86,8 +86,7 @@ export async function createQuestions(params: {
     ],
   };
 
-  const content = await callModel(system, JSON.stringify(user));
-  return parseQuestions(content);
+  return await callModelAndParse(system, JSON.stringify(user));
 }
 
 export async function createSimilarQuestions(params: {
@@ -147,13 +146,27 @@ export async function createSimilarQuestions(params: {
     ],
   };
 
-  const content = await callModel(system, JSON.stringify(user));
-  return parseQuestions(content);
+  return await callModelAndParse(system, JSON.stringify(user));
 }
 
 function ensureConfigured() {
   if (!OPENAI_API_KEY) {
     throw new Error('未检测到 OPENAI_API_KEY，暂时无法调用真实 AI 出题。');
+  }
+}
+
+async function callModelAndParse(system: string, user: string) {
+  const first = await callModel(system, user);
+  try {
+    return parseQuestions(first);
+  } catch {
+    const retryUser = `${user}\n\n请特别注意：上一次返回的 JSON 格式不正确。这一次只能返回可直接解析的 JSON，不要添加任何解释。`;
+    const second = await callModel(system, retryUser);
+    try {
+      return parseQuestions(second);
+    } catch {
+      throw new Error('题目生成失败，请重试一次。');
+    }
   }
 }
 
@@ -209,14 +222,17 @@ async function callModel(system: string, user: string) {
 }
 
 function parseQuestions(text: string) {
-  let parsed: { questions?: GeneratedQuestion[] };
+  let parsed: { questions?: GeneratedQuestion[] } | null = null;
 
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('AI 返回内容无法解析为 JSON。');
-    parsed = JSON.parse(match[0]);
+  for (const candidate of buildJsonCandidates(text)) {
+    try {
+      parsed = JSON.parse(candidate);
+      break;
+    } catch {}
+  }
+
+  if (!parsed) {
+    throw new Error('AI 返回格式错误。');
   }
 
   return {
@@ -230,4 +246,18 @@ function parseQuestions(text: string) {
       points: Array.isArray(q.points) ? q.points : [],
     })),
   };
+}
+
+function buildJsonCandidates(text: string) {
+  const raw = text.trim();
+  const strippedFence = raw.replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim();
+  const match = strippedFence.match(/\{[\s\S]*\}/);
+  const extracted = match ? match[0] : strippedFence;
+
+  const normalized = extracted
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/,\s*([}\]])/g, '$1');
+
+  return Array.from(new Set([raw, strippedFence, extracted, normalized].filter(Boolean)));
 }
