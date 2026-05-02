@@ -11,6 +11,7 @@ type GeneratedQuestion = {
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const MODEL_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS || 60000);
 
 export function getAiConfig() {
   return {
@@ -169,29 +170,42 @@ async function callModel(system: string, user: string) {
     '请直接返回严格 JSON，不要输出 markdown，不要输出额外说明。',
   ].join('\n');
 
-  const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      temperature: 0.7,
-      messages: [
-        { role: 'user', content: mergedPrompt },
-      ],
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
 
-  if (!response.ok) {
-    throw new Error(`AI 接口调用失败：${response.status} ${await response.text()}`);
+  try {
+    const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.7,
+        messages: [
+          { role: 'user', content: mergedPrompt },
+        ],
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI 接口调用失败：${response.status} ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) throw new Error('AI 未返回可用内容。');
+    return content;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`AI 生成超时（>${Math.round(MODEL_TIMEOUT_MS / 1000)}秒），请重试或减少题量。`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content;
-  if (!content) throw new Error('AI 未返回可用内容。');
-  return content;
 }
 
 function parseQuestions(text: string) {

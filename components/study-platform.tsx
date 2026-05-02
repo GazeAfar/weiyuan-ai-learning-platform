@@ -158,7 +158,7 @@ export function StudyPlatform() {
       if (!data.ok) {
         setCurrentQuestions([]);
         setSelectedQuestionIds([]);
-        setServerHint(`生成失败：${data.error}`);
+        setServerHint(formatGenerateHint(String(data.error || '题目生成失败，请稍后再试。')));
         return;
       }
 
@@ -185,7 +185,7 @@ export function StudyPlatform() {
       setServerHint('');
     } catch (error) {
       const message = error instanceof Error ? error.message : '请求失败，请稍后重试。';
-      setServerHint(`生成失败：${message}`);
+      setServerHint(formatGenerateHint(message));
     } finally {
       setIsGenerating(false);
     }
@@ -271,6 +271,14 @@ export function StudyPlatform() {
   function selectAllTopics() {
     setSelectedTopics(topics);
     setTopic('__all__');
+  }
+
+  function formatGenerateHint(message: string) {
+    if (!message) return '题目生成失败，请稍后再试。';
+    if (message.includes('AbortError') || message.includes('超时')) return '这次生成时间有点长，请重试一次，或先减少题量。';
+    if (message.includes('Failed to fetch')) return '当前连接出了点问题，请稍后再试。';
+    if (message.includes('AI 接口调用失败')) return '题目生成暂时失败了，请稍后再试。';
+    return message.startsWith('生成失败：') ? message : `生成失败：${message}`;
   }
 
   function getSelectedQuestions() {
