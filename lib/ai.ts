@@ -174,7 +174,6 @@ async function callModel(system: string, user: string) {
     body: JSON.stringify({
       model: OPENAI_MODEL,
       temperature: 0.7,
-      response_format: { type: 'json_object' },
       messages: [
         { role: 'user', content: mergedPrompt },
       ],
