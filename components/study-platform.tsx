@@ -1,0 +1,454 @@
+"use client";
+
+import { useEffect, useMemo, useState } from 'react';
+
+type Question = {
+  id: string;
+  type: string;
+  stem: string;
+  options: string[];
+  answer: string;
+  explanation: string;
+  points: string[];
+  subject: string;
+  topic: string;
+  localId: string;
+  collected: boolean;
+  isWrong: boolean;
+};
+
+type WrongItem = Omit<Question, 'localId' | 'collected' | 'isWrong'> & { savedAt: number };
+
+type SubjectConfig = {
+  enabled: boolean;
+  comingSoon?: boolean;
+  edition: string;
+  modules: { name: string; topics: string[] }[];
+};
+
+type ConfigPayload = {
+  configured: boolean;
+  model: string;
+  curriculum: {
+    region: string;
+    grade: string;
+    editionHint: string;
+    subjects: Record<string, SubjectConfig>;
+  };
+  subjects: string[];
+};
+
+const WRONG_BOOK_KEY = 'ai-study-wrong-book';
+
+export function StudyPlatform() {
+  const [config, setConfig] = useState<ConfigPayload | null>(null);
+  const [currentQuestions, setCurrentQuestions] = useState<Question[]>([]);
+  const [wrongBook, setWrongBook] = useState<WrongItem[]>([]);
+  const [wrongBookFilter, setWrongBookFilter] = useState('__all__');
+  const [currentPaperMeta, setCurrentPaperMeta] = useState<Record<string, string | number> | null>(null);
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [subject, setSubject] = useState('物理');
+  const [topic, setTopic] = useState('');
+  const [difficulty, setDifficulty] = useState('提升');
+  const [count, setCount] = useState('5');
+  const [region, setRegion] = useState('中国江苏省南京市');
+  const [grade, setGrade] = useState('初三');
+  const [edition, setEdition] = useState('苏教版（江苏凤凰科技出版社）');
+  const [serverHint, setServerHint] = useState('正在检测 AI 配置');
+  const [statusTone, setStatusTone] = useState<'pending' | 'ok' | 'error'>('pending');
+  const [statusText, setStatusText] = useState('正在检测 AI 配置');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [result, setResult] = useState<{ score: number; total: number } | null>(null);
+
+  useEffect(() => {
+    const cached = localStorage.getItem(WRONG_BOOK_KEY);
+    if (cached) {
+      try {
+        setWrongBook(JSON.parse(cached));
+      } catch {}
+    }
+
+    fetch('/api/config')
+      .then((res) => res.json())
+      .then((data: ConfigPayload) => {
+        setConfig(data);
+        setRegion(data.curriculum.region);
+        setGrade(data.curriculum.grade);
+        const firstSubject = data.subjects.find((item) => data.curriculum.subjects[item]?.enabled) || data.subjects[0] || '物理';
+        setSubject(firstSubject);
+        setEdition(data.curriculum.subjects[firstSubject]?.edition || '待补充');
+        const topics = data.curriculum.subjects[firstSubject]?.modules.flatMap((m) => m.topics) || [];
+        setTopic(topics[0] || '');
+        if (data.configured) {
+          setStatusTone('ok');
+          setStatusText(`AI 已连接 · ${data.model}`);
+          setServerHint('已检测到 AI 配置，可以按地区和知识点生成真题。');
+        } else {
+          setStatusTone('error');
+          setStatusText('AI 未配置');
+          setServerHint('请先配置 OPENAI_API_KEY，再启动服务。');
+        }
+      })
+      .catch((error) => {
+        setStatusTone('error');
+        setStatusText('服务异常');
+        setServerHint(`配置读取失败：${error.message}`);
+      });
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(WRONG_BOOK_KEY, JSON.stringify(wrongBook));
+  }, [wrongBook]);
+
+  const subjectData = config?.curriculum.subjects[subject];
+  const topics = useMemo(() => subjectData?.modules.flatMap((m) => m.topics) || [], [subjectData]);
+  const wrongBookTopics = useMemo(() => [...new Set(wrongBook.map((item) => item.topic).filter(Boolean))], [wrongBook]);
+  const filteredWrongBook = useMemo(
+    () => (wrongBookFilter === '__all__' ? wrongBook : wrongBook.filter((item) => item.topic === wrongBookFilter)),
+    [wrongBook, wrongBookFilter],
+  );
+
+  useEffect(() => {
+    if (subjectData) {
+      setEdition(subjectData.edition || edition);
+      const nextTopics = subjectData.modules.flatMap((m) => m.topics);
+      setTopic(nextTopics[0] || '');
+    }
+  }, [subject]);
+
+  function updateAnswer(localId: string, value: string) {
+    setAnswers((prev) => ({ ...prev, [localId]: value }));
+  }
+
+  function existsWrongQuestion(question: Pick<Question, 'stem' | 'topic' | 'subject'>) {
+    return wrongBook.some((item) => item.stem === question.stem && item.topic === question.topic && item.subject === question.subject);
+  }
+
+  async function generateQuestions() {
+    if (!subjectData?.enabled) return;
+    setIsGenerating(true);
+    setResult(null);
+    setQuizSubmitted(false);
+
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject, topic, difficulty, count: Number(count), region, grade, edition }),
+    });
+    const data = await res.json();
+    setIsGenerating(false);
+
+    if (!data.ok) {
+      setCurrentQuestions([]);
+      setServerHint(`生成失败：${data.error}`);
+      return;
+    }
+
+    const next = data.questions.map((item: Omit<Question, 'subject' | 'topic' | 'localId' | 'collected' | 'isWrong'>, index: number) => ({
+      ...item,
+      subject,
+      topic,
+      localId: `${Date.now()}-${index}`,
+      collected: false,
+      isWrong: false,
+    }));
+
+    setAnswers({});
+    setCurrentQuestions(next);
+    setCurrentPaperMeta({ subject, topic, difficulty, count, edition });
+  }
+
+  function submitQuiz() {
+    let score = 0;
+    const next = currentQuestions.map((question) => {
+      const userAnswer = normalize(answers[question.localId] || '');
+      const ok = judge(userAnswer, normalize(question.answer), question.type);
+      if (ok) score += 1;
+      return { ...question, isWrong: !ok };
+    });
+    setCurrentQuestions(next);
+    setQuizSubmitted(true);
+    setResult({ score, total: next.length });
+  }
+
+  function addToWrongBook(localId: string) {
+    const question = currentQuestions.find((item) => item.localId === localId);
+    if (!question || existsWrongQuestion(question)) return;
+    setWrongBook((prev) => [{ ...question, savedAt: Date.now() }, ...prev]);
+    setCurrentQuestions((prev) => prev.map((item) => (item.localId === localId ? { ...item, collected: true } : item)));
+  }
+
+  async function retryFromWrongBook() {
+    const selected = filteredWrongBook.filter((item) => answers[`wrong-${item.savedAt}`] === '1');
+    if (!selected.length) {
+      alert('请至少选择一道错题。');
+      return;
+    }
+
+    setIsRetrying(true);
+    const res = await fetch('/api/regenerate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: selected[0].subject, region, grade, edition, selected }),
+    });
+    const data = await res.json();
+    setIsRetrying(false);
+
+    if (!data.ok) {
+      setServerHint(`相似题生成失败：${data.error}`);
+      return;
+    }
+
+    const next = data.questions.map((item: Omit<Question, 'subject' | 'topic' | 'localId' | 'collected' | 'isWrong'>, index: number) => ({
+      ...item,
+      subject: selected[0].subject,
+      topic: item.points?.[0] || selected[index]?.topic || '相似题训练',
+      localId: `retry-${Date.now()}-${index}`,
+      collected: false,
+      isWrong: false,
+    }));
+
+    setAnswers({});
+    setQuizSubmitted(false);
+    setResult(null);
+    setCurrentQuestions(next);
+    setCurrentPaperMeta({ subject: selected[0].subject, topic: '错题相似题强化', difficulty: '跟随错题难度', count: next.length, edition });
+  }
+
+  return (
+    <div className="shell">
+      <header className="hero card">
+        <div>
+          <p className="eyebrow">初三 · 多学科 AI 自适应练习</p>
+          <h1>微远AI学习平台</h1>
+          <p className="hero-text">面向南京初三学生，先上线物理，后续可扩展数学等学科，并按地区教材与中考风格生成训练内容。</p>
+        </div>
+        <div className="hero-side">
+          <div className="hero-chip">真实 AI 出题</div>
+          <div className="hero-chip">错题强化训练</div>
+          <div className="hero-chip">模块化知识点</div>
+        </div>
+      </header>
+
+      <main className="layout">
+        <section className="card full">
+          <div className="title-row">
+            <div>
+              <h2>1. 选择学科与知识模块</h2>
+              <p>按学科、地区、知识点、难度和题量生成本次练习</p>
+            </div>
+            <div className={`status-pill ${statusTone}`}>{statusText}</div>
+          </div>
+
+          <div className="control-grid">
+            <label>
+              <span>学科</span>
+              <select value={subject} onChange={(e) => setSubject(e.target.value)}>
+                {config?.subjects.map((item) => {
+                  const conf = config.curriculum.subjects[item];
+                  return (
+                    <option key={item} value={item} disabled={!conf.enabled}>
+                      {item}
+                      {conf.comingSoon ? '（即将上线）' : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <label><span>地区</span><input value={region} onChange={(e) => setRegion(e.target.value)} /></label>
+            <label><span>年级</span><input value={grade} onChange={(e) => setGrade(e.target.value)} /></label>
+            <label><span>教材版本</span><input value={edition} onChange={(e) => setEdition(e.target.value)} /></label>
+            <label>
+              <span>知识点</span>
+              <select value={topic} onChange={(e) => setTopic(e.target.value)} disabled={!subjectData?.enabled}>
+                {topics.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>难度</span>
+              <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                <option value="基础">基础</option>
+                <option value="提升">提升</option>
+                <option value="冲刺">冲刺</option>
+              </select>
+            </label>
+            <label>
+              <span>题量</span>
+              <select value={count} onChange={(e) => setCount(e.target.value)}>
+                <option value="3">3 题</option>
+                <option value="5">5 题</option>
+                <option value="8">8 题</option>
+              </select>
+            </label>
+          </div>
+
+          {!subjectData?.enabled && <div className="subject-status">{subject} 当前为“即将上线”状态，建议先使用物理。</div>}
+          <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled}>{isGenerating ? '正在生成...' : '生成题目'}</button>
+          <p className="note">{serverHint}</p>
+        </section>
+
+        <section className="card sidebar">
+          <h2>学科知识模块</h2>
+          <div className="topic-preview">
+            {subjectData?.modules.length ? subjectData.modules.map((module) => (
+              <section key={module.name} className="module-card">
+                <h3>{module.name}</h3>
+                <div className="topic-chip-list">
+                  {module.topics.map((item) => (
+                    <button key={item} type="button" className={`topic-chip ${topic === item ? 'active' : ''}`} onClick={() => setTopic(item)}>{item}</button>
+                  ))}
+                </div>
+              </section>
+            )) : <div className="module-card pending-card"><h3>该学科即将上线</h3><p>知识点和题型正在整理中。</p></div>}
+          </div>
+        </section>
+
+        <section className="card content">
+          <div className="title-row">
+            <div>
+              <h2>2. 在线测试</h2>
+              <p>答题后自动评分，并展示答案与解题思路</p>
+            </div>
+            <button className="secondary-btn" onClick={submitQuiz}>提交并评分</button>
+          </div>
+
+          {currentPaperMeta && (
+            <div className="paper-summary">
+              <div className="summary-chip"><strong>学科</strong><span>{String(currentPaperMeta.subject)}</span></div>
+              <div className="summary-chip"><strong>知识点</strong><span>{String(currentPaperMeta.topic)}</span></div>
+              <div className="summary-chip"><strong>难度</strong><span>{String(currentPaperMeta.difficulty)}</span></div>
+              <div className="summary-chip"><strong>题量</strong><span>{String(currentPaperMeta.count)} 题</span></div>
+              <div className="summary-chip wide"><strong>教材</strong><span>{String(currentPaperMeta.edition)}</span></div>
+            </div>
+          )}
+
+          {!currentQuestions.length ? <div className="empty-state">请先生成题目。</div> : (
+            <div className="quiz-list">
+              {currentQuestions.map((question, index) => {
+                const alreadyCollected = existsWrongQuestion(question) || question.collected;
+                return (
+                  <article key={question.localId} className={`question-card ${quizSubmitted ? question.isWrong ? 'wrong' : 'correct' : ''}`}>
+                    <div className="question-header">
+                      <div>
+                        <strong>第 {index + 1} 题：{question.stem}</strong>
+                        <div className="question-meta">学科：{question.subject} · 知识点：{question.topic}{question.points?.length ? ` · 关联点：${question.points.join('、')}` : ''}</div>
+                      </div>
+                      <span className="question-type">{labelType(question.type)}</span>
+                    </div>
+
+                    {question.type === 'single_choice' ? (
+                      <div className="options options-selectable">
+                        {question.options.map((option, idx) => {
+                          const value = extractOptionValue(option, idx);
+                          const checked = answers[question.localId] === value;
+                          return (
+                            <label key={option} className={`option-item option-selectable ${checked ? 'selected' : ''}`}>
+                              <input type="radio" name={question.localId} checked={checked} onChange={() => updateAnswer(question.localId, value)} />
+                              <span>{option}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : question.type === 'fill_blank' ? (
+                      <input className="short-answer" value={answers[question.localId] || ''} onChange={(e) => updateAnswer(question.localId, e.target.value)} placeholder="请输入答案" />
+                    ) : (
+                      <textarea rows={3} value={answers[question.localId] || ''} onChange={(e) => updateAnswer(question.localId, e.target.value)} placeholder="请输入你的答案" />
+                    )}
+
+                    <div className={`answer-block ${quizSubmitted ? 'show' : ''}`}>
+                      <p><strong>正确答案：</strong>{question.answer}</p>
+                      <p><strong>解题思路：</strong>{question.explanation}</p>
+                      {quizSubmitted && question.isWrong && (
+                        <div className="question-tools">
+                          <button className={`collect-btn ${alreadyCollected ? 'added' : ''}`} disabled={alreadyCollected} onClick={() => addToWrongBook(question.localId)}>
+                            {alreadyCollected ? '已加入错题集' : '加入错题集'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {result && <div className="result"><strong>本次得分：{result.score} / {result.total}</strong><p className="analysis">错题已显示答案与解题思路。你可以按需加入错题集，再继续生成相似题强化练习。</p></div>}
+        </section>
+
+        <section className="card content">
+          <div className="title-row">
+            <div>
+              <h2>3. 错题集</h2>
+              <p>可选择错题并生成同知识点类似题</p>
+            </div>
+            <div className="action-row">
+              <button className="secondary-btn subtle-btn" onClick={() => setWrongBook([])}>清空错题集</button>
+              <button className="primary-btn light-btn" onClick={retryFromWrongBook} disabled={isRetrying}>{isRetrying ? '正在生成...' : '生成相似题'}</button>
+            </div>
+          </div>
+
+          <div className="wrong-book-toolbar">
+            <label>
+              <span>按知识点筛选</span>
+              <select value={wrongBookFilter} onChange={(e) => setWrongBookFilter(e.target.value)}>
+                <option value="__all__">全部知识点</option>
+                {wrongBookTopics.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {!filteredWrongBook.length ? <div className="empty-state">暂无错题。</div> : (
+            <div className="wrong-book">
+              {filteredWrongBook.map((item) => (
+                <article key={item.savedAt} className="wrong-card">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={answers[`wrong-${item.savedAt}`] === '1'}
+                      onChange={(e) => updateAnswer(`wrong-${item.savedAt}`, e.target.checked ? '1' : '0')}
+                    />
+                    <div>
+                      <strong>{item.stem}</strong>
+                      <p className="question-meta">学科：{item.subject} · 知识点：{item.topic} · 题型：{labelType(item.type)}</p>
+                      <p className="analysis"><strong>答案：</strong>{item.answer}</p>
+                      <p className="analysis"><strong>思路：</strong>{item.explanation}</p>
+                      <div className="wrong-book-tools">
+                        <button className="text-btn" onClick={() => setWrongBook((prev) => prev.filter((source) => source.savedAt !== item.savedAt))}>删除</button>
+                      </div>
+                    </div>
+                  </label>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function labelType(type: string) {
+  return {
+    single_choice: '选择题',
+    fill_blank: '填空题',
+    calculation: '计算题',
+    short_answer: '简答题',
+  }[type] || '题目';
+}
+
+function extractOptionValue(optionText: string, index: number) {
+  const match = optionText.match(/^([A-D])[\.．、\s]/i);
+  return match ? match[1].toUpperCase() : String.fromCharCode(65 + index);
+}
+
+function judge(user: string, answer: string, type: string) {
+  if (!user) return false;
+  if (type === 'single_choice') return user === answer || user.replace(/\./g, '') === answer.replace(/\./g, '');
+  return user === answer || user.includes(answer) || answer.includes(user);
+}
+
+function normalize(value: string) {
+  return String(value).trim().toLowerCase().replace(/\s+/g, '');
+}
