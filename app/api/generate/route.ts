@@ -12,8 +12,9 @@ export async function POST(request: NextRequest) {
     const region = body?.region || CURRICULUM.region;
     const grade = body?.grade || CURRICULUM.grade;
     const edition = body?.edition || CURRICULUM.subjects[subject].edition;
+    const mode = body?.mode || 'regular';
 
-    const data = await createQuestions({ subject, topic, count, difficulty, region, grade, edition });
+    const data = await createQuestions({ subject, topic, count, difficulty, region, grade, edition, mode });
     return NextResponse.json({ ok: true, source: 'ai', ...data });
   } catch (error) {
     return NextResponse.json(

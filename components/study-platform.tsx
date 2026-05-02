@@ -51,6 +51,7 @@ export function StudyPlatform() {
   const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState('提升');
   const [count, setCount] = useState('5');
+  const [mode, setMode] = useState<'regular' | 'common_sense'>('regular');
   const [region, setRegion] = useState('中国江苏省南京市');
   const [grade, setGrade] = useState('初三');
   const [edition, setEdition] = useState('苏教版（江苏凤凰科技出版社）');
@@ -60,6 +61,7 @@ export function StudyPlatform() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   const [result, setResult] = useState<{ score: number; total: number } | null>(null);
 
   useEffect(() => {
@@ -118,8 +120,8 @@ export function StudyPlatform() {
     }
   }, [subject]);
 
-  function updateAnswer(localId: string, value: string) {
-    setAnswers((prev) => ({ ...prev, [localId]: value }));
+  function updateAnswer(key: string, value: string) {
+    setAnswers((prev) => ({ ...prev, [key]: value }));
   }
 
   function existsWrongQuestion(question: Pick<Question, 'stem' | 'topic' | 'subject'>) {
@@ -135,13 +137,14 @@ export function StudyPlatform() {
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject, topic, difficulty, count: Number(count), region, grade, edition }),
+      body: JSON.stringify({ subject, topic, difficulty, count: Number(count), region, grade, edition, mode }),
     });
     const data = await res.json();
     setIsGenerating(false);
 
     if (!data.ok) {
       setCurrentQuestions([]);
+      setSelectedQuestionIds([]);
       setServerHint(`生成失败：${data.error}`);
       return;
     }
@@ -157,7 +160,15 @@ export function StudyPlatform() {
 
     setAnswers({});
     setCurrentQuestions(next);
-    setCurrentPaperMeta({ subject, topic, difficulty, count, edition });
+    setSelectedQuestionIds(next.map((item: Question) => item.localId));
+    setCurrentPaperMeta({
+      subject,
+      topic,
+      difficulty,
+      count,
+      edition,
+      mode: mode === 'regular' ? '常规练习' : '生活常识专项',
+    });
   }
 
   function submitQuiz() {
@@ -214,7 +225,36 @@ export function StudyPlatform() {
     setQuizSubmitted(false);
     setResult(null);
     setCurrentQuestions(next);
-    setCurrentPaperMeta({ subject: selected[0].subject, topic: '错题相似题强化', difficulty: '跟随错题难度', count: next.length, edition });
+    setSelectedQuestionIds(next.map((item: Question) => item.localId));
+    setCurrentPaperMeta({ subject: selected[0].subject, topic: '错题相似题强化', difficulty: '跟随错题难度', count: next.length, edition, mode: '错题重练' });
+  }
+
+  function toggleQuestionSelection(localId: string, checked: boolean) {
+    setSelectedQuestionIds((prev) => checked ? Array.from(new Set([...prev, localId])) : prev.filter((id) => id !== localId));
+  }
+
+  function toggleSelectAll(checked: boolean) {
+    setSelectedQuestionIds(checked ? currentQuestions.map((item) => item.localId) : []);
+  }
+
+  function printSelectedQuestions() {
+    const selected = currentQuestions.filter((item) => selectedQuestionIds.includes(item.localId));
+    if (!selected.length) {
+      alert('请先勾选至少一道题目。');
+      return;
+    }
+
+    const html = buildPrintHtml(selected, currentPaperMeta);
+    const win = window.open('', '_blank');
+    if (!win) {
+      alert('浏览器拦截了新窗口，请允许弹窗后重试。');
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 300);
   }
 
   return (
@@ -228,7 +268,7 @@ export function StudyPlatform() {
         <div className="hero-side">
           <div className="hero-chip">真实 AI 出题</div>
           <div className="hero-chip">错题强化训练</div>
-          <div className="hero-chip">模块化知识点</div>
+          <div className="hero-chip">打印线下练习</div>
         </div>
       </header>
 
@@ -237,7 +277,7 @@ export function StudyPlatform() {
           <div className="title-row">
             <div>
               <h2>1. 选择学科与知识模块</h2>
-              <p>按学科、地区、知识点、难度和题量生成本次练习</p>
+              <p>按学科、地区、知识点、模式、难度和题量生成本次练习</p>
             </div>
             <div className={`status-pill ${statusTone}`}>{statusText}</div>
           </div>
@@ -248,13 +288,15 @@ export function StudyPlatform() {
               <select value={subject} onChange={(e) => setSubject(e.target.value)}>
                 {config?.subjects.map((item) => {
                   const conf = config.curriculum.subjects[item];
-                  return (
-                    <option key={item} value={item} disabled={!conf.enabled}>
-                      {item}
-                      {conf.comingSoon ? '（即将上线）' : ''}
-                    </option>
-                  );
+                  return <option key={item} value={item} disabled={!conf.enabled}>{item}{conf.comingSoon ? '（即将上线）' : ''}</option>;
                 })}
+              </select>
+            </label>
+            <label>
+              <span>出题模式</span>
+              <select value={mode} onChange={(e) => setMode(e.target.value as 'regular' | 'common_sense')}>
+                <option value="regular">常规练习</option>
+                <option value="common_sense">生活常识专项</option>
               </select>
             </label>
             <label><span>地区</span><input value={region} onChange={(e) => setRegion(e.target.value)} /></label>
@@ -280,11 +322,13 @@ export function StudyPlatform() {
                 <option value="3">3 题</option>
                 <option value="5">5 题</option>
                 <option value="8">8 题</option>
+                <option value="15">15 题（整卷风格）</option>
               </select>
             </label>
           </div>
 
           {!subjectData?.enabled && <div className="subject-status">{subject} 当前为“即将上线”状态，建议先使用物理。</div>}
+          {mode === 'common_sense' && <div className="subject-status info">当前为生活常识专项：以生活化选择题为主，搭配少量单位填空题。</div>}
           <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled}>{isGenerating ? '正在生成...' : '生成题目'}</button>
           <p className="note">{serverHint}</p>
         </section>
@@ -296,9 +340,7 @@ export function StudyPlatform() {
               <section key={module.name} className="module-card">
                 <h3>{module.name}</h3>
                 <div className="topic-chip-list">
-                  {module.topics.map((item) => (
-                    <button key={item} type="button" className={`topic-chip ${topic === item ? 'active' : ''}`} onClick={() => setTopic(item)}>{item}</button>
-                  ))}
+                  {module.topics.map((item) => <button key={item} type="button" className={`topic-chip ${topic === item ? 'active' : ''}`} onClick={() => setTopic(item)}>{item}</button>)}
                 </div>
               </section>
             )) : <div className="module-card pending-card"><h3>该学科即将上线</h3><p>知识点和题型正在整理中。</p></div>}
@@ -308,10 +350,14 @@ export function StudyPlatform() {
         <section className="card content">
           <div className="title-row">
             <div>
-              <h2>2. 在线测试</h2>
-              <p>答题后自动评分，并展示答案与解题思路</p>
+              <h2>2. 在线测试 / 试卷生成</h2>
+              <p>网页可在线作答；画图题、实验题、整卷模拟更建议打印线下完成</p>
             </div>
-            <button className="secondary-btn" onClick={submitQuiz}>提交并评分</button>
+            <div className="action-row">
+              <button className="secondary-btn subtle-btn" onClick={() => toggleSelectAll(selectedQuestionIds.length !== currentQuestions.length)} disabled={!currentQuestions.length}>{selectedQuestionIds.length === currentQuestions.length && currentQuestions.length ? '取消全选' : '全选题目'}</button>
+              <button className="secondary-btn" onClick={printSelectedQuestions} disabled={!currentQuestions.length}>生成打印版 / PDF</button>
+              <button className="secondary-btn" onClick={submitQuiz} disabled={!currentQuestions.length}>提交并评分</button>
+            </div>
           </div>
 
           {currentPaperMeta && (
@@ -320,6 +366,7 @@ export function StudyPlatform() {
               <div className="summary-chip"><strong>知识点</strong><span>{String(currentPaperMeta.topic)}</span></div>
               <div className="summary-chip"><strong>难度</strong><span>{String(currentPaperMeta.difficulty)}</span></div>
               <div className="summary-chip"><strong>题量</strong><span>{String(currentPaperMeta.count)} 题</span></div>
+              <div className="summary-chip"><strong>模式</strong><span>{String(currentPaperMeta.mode)}</span></div>
               <div className="summary-chip wide"><strong>教材</strong><span>{String(currentPaperMeta.edition)}</span></div>
             </div>
           )}
@@ -328,10 +375,15 @@ export function StudyPlatform() {
             <div className="quiz-list">
               {currentQuestions.map((question, index) => {
                 const alreadyCollected = existsWrongQuestion(question) || question.collected;
+                const isChecked = selectedQuestionIds.includes(question.localId);
                 return (
                   <article key={question.localId} className={`question-card ${quizSubmitted ? question.isWrong ? 'wrong' : 'correct' : ''}`}>
                     <div className="question-header">
-                      <div>
+                      <div className="question-head-main">
+                        <label className="pick-box">
+                          <input type="checkbox" checked={isChecked} onChange={(e) => toggleQuestionSelection(question.localId, e.target.checked)} />
+                          <span>加入打印试卷</span>
+                        </label>
                         <strong>第 {index + 1} 题：{question.stem}</strong>
                         <div className="question-meta">学科：{question.subject} · 知识点：{question.topic}{question.points?.length ? ` · 关联点：${question.points.join('、')}` : ''}</div>
                       </div>
@@ -354,7 +406,7 @@ export function StudyPlatform() {
                     ) : question.type === 'fill_blank' ? (
                       <input className="short-answer" value={answers[question.localId] || ''} onChange={(e) => updateAnswer(question.localId, e.target.value)} placeholder="请输入答案" />
                     ) : (
-                      <textarea rows={3} value={answers[question.localId] || ''} onChange={(e) => updateAnswer(question.localId, e.target.value)} placeholder="请输入你的答案" />
+                      <textarea rows={question.type.includes('experiment') ? 6 : 4} value={answers[question.localId] || ''} onChange={(e) => updateAnswer(question.localId, e.target.value)} placeholder={question.type === 'drawing' ? '此题更适合打印后作图，线上可简要描述。' : '请输入你的答案'} />
                     )}
 
                     <div className={`answer-block ${quizSubmitted ? 'show' : ''}`}>
@@ -404,11 +456,7 @@ export function StudyPlatform() {
               {filteredWrongBook.map((item) => (
                 <article key={item.savedAt} className="wrong-card">
                   <label>
-                    <input
-                      type="checkbox"
-                      checked={answers[`wrong-${item.savedAt}`] === '1'}
-                      onChange={(e) => updateAnswer(`wrong-${item.savedAt}`, e.target.checked ? '1' : '0')}
-                    />
+                    <input type="checkbox" checked={answers[`wrong-${item.savedAt}`] === '1'} onChange={(e) => updateAnswer(`wrong-${item.savedAt}`, e.target.checked ? '1' : '0')} />
                     <div>
                       <strong>{item.stem}</strong>
                       <p className="question-meta">学科：{item.subject} · 知识点：{item.topic} · 题型：{labelType(item.type)}</p>
@@ -429,10 +477,53 @@ export function StudyPlatform() {
   );
 }
 
+function buildPrintHtml(questions: Question[], meta: Record<string, string | number> | null) {
+  const body = questions.map((question, index) => `
+    <section class="print-question">
+      <h3>${index + 1}. ${escapeHtml(question.stem)}</h3>
+      ${question.options?.length ? `<ul>${question.options.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+      <p class="meta">题型：${escapeHtml(labelType(question.type))}　知识点：${escapeHtml(question.topic)}</p>
+      ${renderOfflineAnswerArea(question.type)}
+    </section>
+  `).join('');
+
+  return `<!doctype html>
+  <html lang="zh-CN">
+    <head>
+      <meta charset="utf-8" />
+      <title>微远AI学习平台打印试卷</title>
+      <style>
+        body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111;padding:24px;line-height:1.7}
+        h1{font-size:26px;margin-bottom:8px} h2{font-size:14px;color:#666;font-weight:normal;margin-top:0}
+        .print-question{margin:20px 0;padding-bottom:18px;border-bottom:1px dashed #bbb;page-break-inside:avoid}
+        .meta{font-size:12px;color:#666}.blank{height:90px;border-bottom:1px solid #bbb;margin-top:10px}
+        .blank.tall{height:180px}.blank.drawing{height:220px;border:1px solid #bbb}.hint{font-size:12px;color:#666}
+        ul{padding-left:20px} @media print{body{padding:0 10mm}}
+      </style>
+    </head>
+    <body>
+      <h1>微远AI学习平台 · 打印试卷</h1>
+      <h2>${meta ? `学科：${escapeHtml(String(meta.subject))} ｜ 知识点：${escapeHtml(String(meta.topic))} ｜ 模式：${escapeHtml(String(meta.mode))} ｜ 教材：${escapeHtml(String(meta.edition))}` : ''}</h2>
+      ${body}
+    </body>
+  </html>`;
+}
+
+function renderOfflineAnswerArea(type: string) {
+  if (type === 'drawing') return '<p class="hint">请在线下完成作图。</p><div class="blank drawing"></div>';
+  if (type === 'experiment_textbook' || type === 'experiment_innovative') return '<p class="hint">请在线下完成实验分析作答。</p><div class="blank tall"></div>';
+  if (type === 'calculation' || type === 'short_answer') return '<div class="blank tall"></div>';
+  if (type === 'fill_blank') return '<div class="blank"></div>';
+  return '';
+}
+
 function labelType(type: string) {
   return {
     single_choice: '选择题',
     fill_blank: '填空题',
+    drawing: '画图题',
+    experiment_textbook: '书本实验题',
+    experiment_innovative: '创新实验题',
     calculation: '计算题',
     short_answer: '简答题',
   }[type] || '题目';
@@ -451,4 +542,8 @@ function judge(user: string, answer: string, type: string) {
 
 function normalize(value: string) {
   return String(value).trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function escapeHtml(value: string) {
+  return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 }
