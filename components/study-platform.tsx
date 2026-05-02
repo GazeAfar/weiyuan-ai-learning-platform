@@ -55,7 +55,7 @@ export function StudyPlatform() {
   const [mode, setMode] = useState<'regular' | 'common_sense'>('regular');
   const [region, setRegion] = useState('中国江苏省南京市');
   const [grade, setGrade] = useState('初三');
-  const [edition, setEdition] = useState('苏教版（江苏凤凰科技出版社）');
+  const [edition, setEdition] = useState('苏教版');
   const [serverHint, setServerHint] = useState('正在检测 AI 配置');
   const [statusTone, setStatusTone] = useState<'pending' | 'ok' | 'error'>('pending');
   const [statusText, setStatusText] = useState('正在检测 AI 配置');
@@ -298,9 +298,9 @@ export function StudyPlatform() {
     <div className="shell">
       <header className="hero card">
         <div>
-          <p className="eyebrow">初三 · 多学科 AI 自适应练习</p>
+          <p className="eyebrow">南京初三同步练习</p>
           <h1>微远AI学习平台</h1>
-          <p className="hero-text">面向南京初三学生，先上线物理，后续可扩展数学等学科，并按地区教材与中考风格生成训练内容。</p>
+          <p className="hero-text">先练物理，贴合南京初三和苏教版内容。选好知识点后，就能直接生成练习题。</p>
         </div>
         <div className="hero-side">
           <div className="hero-chip">智能练习</div>
@@ -340,10 +340,12 @@ export function StudyPlatform() {
           </div>
 
           <div className="form-section">
-            <div className="control-grid">
-              <label><span>地区</span><input value={region} onChange={(e) => setRegion(e.target.value)} /></label>
-              <label><span>年级</span><input value={grade} onChange={(e) => setGrade(e.target.value)} /></label>
-              <label><span>教材版本</span><input value={edition} onChange={(e) => setEdition(e.target.value)} /></label>
+            <div className="paper-summary static-summary">
+              <div className="summary-chip"><strong>地区</strong><span>{region}</span></div>
+              <div className="summary-chip"><strong>年级</strong><span>{grade}</span></div>
+              <div className="summary-chip"><strong>教材</strong><span>{edition}</span></div>
+            </div>
+            <div className="control-grid compact-grid">
               <label>
                 <span>难度</span>
                 <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
@@ -364,13 +366,13 @@ export function StudyPlatform() {
             </div>
           </div>
 
-          {!subjectData?.enabled && <div className="subject-status">{subject} 当前为“即将上线”状态，建议先使用物理。</div>}
-          {mode === 'common_sense' && <div className="subject-status info">生活常识专项会更偏基础判断题，适合专门查漏补缺。</div>}
+          {!subjectData?.enabled && <div className="subject-status">{subject} 还在整理中，当前建议先使用物理。</div>}
+          {mode === 'common_sense' && <div className="subject-status info">这个模式更适合练基础常识题，比如单位、估测、常见现象和科学家。</div>}
           <div className="topic-selector-card">
             <div className="topic-selector-head">
               <div>
                 <strong>选择知识点</strong>
-                <p className="note">已选 {selectedTopics.length} 个知识点{selectedTopics.length === topics.length && topics.length > 0 ? '（当前为所有知识点）' : ''}。</p>
+                <p className="note">已选 {selectedTopics.length} 个知识点{selectedTopics.length === topics.length && topics.length > 0 ? '（已全选）' : ''}。</p>
               </div>
               <button type="button" className="text-btn" onClick={selectAllTopics}>全选</button>
             </div>
@@ -394,25 +396,25 @@ export function StudyPlatform() {
               )) : <div className="module-card pending-card"><h3>该学科即将上线</h3><p>知识点和题型正在整理中。</p></div>}
             </div>
           </div>
-          <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled || !selectedTopics.length}>{isGenerating ? '正在生成...' : '生成题目'}</button>
+          <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled || !selectedTopics.length}>{isGenerating ? '正在生成题目...' : '开始生成题目'}</button>
         </section>
 
         <section className="card content">
           <div className="title-row">
             <div>
-              <h2>开始做题</h2>
-              <p>选择题、填空题可以直接在线做；画图题、实验题更适合打印后完成。</p>
+              <h2>开始练习</h2>
+              <p>选择题、填空题可以直接在线完成；画图题和实验题更适合打印后做。</p>
             </div>
             <div className="action-row">
-              <button className="secondary-btn subtle-btn" onClick={() => toggleSelectAll(selectedQuestionIds.length !== currentQuestions.length)} disabled={!currentQuestions.length}>{selectedQuestionIds.length === currentQuestions.length && currentQuestions.length ? '取消全选' : '全选题目'}</button>
-              <button className="secondary-btn" onClick={printSelectedQuestions} disabled={!currentQuestions.length}>打印试卷 / PDF</button>
+              <button className="secondary-btn subtle-btn" onClick={() => toggleSelectAll(selectedQuestionIds.length !== currentQuestions.length)} disabled={!currentQuestions.length}>{selectedQuestionIds.length === currentQuestions.length && currentQuestions.length ? '取消全选' : '全选本次题目'}</button>
+              <button className="secondary-btn" onClick={printSelectedQuestions} disabled={!currentQuestions.length}>打印练习题 / PDF</button>
               <button className="secondary-btn" onClick={printSelectedAnswers} disabled={!currentQuestions.length}>打印答案解析 / PDF</button>
               <button className="secondary-btn" onClick={() => {
                 if (!currentQuestions.length) return;
-                if (window.confirm('确认提交并评分吗？提交后将立即显示答案和解析。')) {
+                if (window.confirm('确定现在提交吗？提交后会立即显示答案和解析。')) {
                   submitQuiz();
                 }
-              }} disabled={!currentQuestions.length}>提交并评分</button>
+              }} disabled={!currentQuestions.length}>提交并查看结果</button>
             </div>
           </div>
 
@@ -427,7 +429,7 @@ export function StudyPlatform() {
             </div>
           )}
 
-          {!currentQuestions.length ? <div className="empty-state">请先生成题目。</div> : (
+          {!currentQuestions.length ? <div className="empty-state">请先生成题目，再开始练习。</div> : (
             <div className="quiz-list">
               {currentQuestions.map((question, index) => {
                 const alreadyCollected = existsWrongQuestion(question) || question.collected;
@@ -438,7 +440,7 @@ export function StudyPlatform() {
                       <div className="question-head-main">
                         <label className="pick-box">
                           <input type="checkbox" checked={isChecked} onChange={(e) => toggleQuestionSelection(question.localId, e.target.checked)} />
-                          <span>加入打印试卷</span>
+                          <span>加入打印内容</span>
                         </label>
                         <strong>第 {index + 1} 题：{question.stem}</strong>
                         <div className="question-meta">学科：{question.subject} · 知识点：{question.topic}{question.points?.length ? ` · 关联点：${question.points.join('、')}` : ''}</div>
@@ -466,8 +468,8 @@ export function StudyPlatform() {
                     )}
 
                     <div className={`answer-block ${quizSubmitted ? 'show' : ''}`}>
-                      <p><strong>正确答案：</strong>{question.answer}</p>
-                      <p><strong>解题思路：</strong>{question.explanation}</p>
+                      <p><strong>参考答案：</strong>{question.answer}</p>
+                      <p><strong>讲解：</strong>{question.explanation}</p>
                       {quizSubmitted && question.isWrong && (
                         <div className="question-tools">
                           <button className={`collect-btn ${alreadyCollected ? 'added' : ''}`} disabled={alreadyCollected} onClick={() => addToWrongBook(question.localId)}>

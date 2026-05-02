@@ -13,11 +13,11 @@ export type SubjectConfig = {
 export const CURRICULUM = {
   region: '中国江苏省南京市',
   grade: '初三',
-  editionHint: '物理当前默认按苏教版（江苏凤凰科技出版社）与南京地区中考风格命题，后续可继续补充其他学科教材版本。',
+  editionHint: '物理当前默认按苏教版与南京地区中考风格命题，后续可继续补充其他学科教材版本。',
   subjects: {
     物理: {
       enabled: true,
-      edition: '苏教版（江苏凤凰科技出版社）',
+      edition: '苏教版',
       modules: [
         { name: '声学与热学', topics: ['声现象', '物态变化', '热和能', '内能与热机'] },
         { name: '光学', topics: ['光现象', '透镜及其应用'] },
