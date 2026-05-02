@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>微远AI学习平台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero card">
+        <div>
+          <p class="eyebrow">初三 · 多学科 AI 自适应练习</p>
+          <h1>微远AI学习平台</h1>
+          <p class="hero-text">面向南京初三学生，先上线物理，后续可扩展数学等学科，并按地区教材与中考风格生成训练内容。</p>
+        </div>
+        <div class="hero-side">
+          <div class="hero-chip">真实 AI 出题</div>
+          <div class="hero-chip">错题强化训练</div>
+          <div class="hero-chip">模块化知识点</div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="card full">
+          <div class="title-row">
+            <div>
+              <h2>1. 选择学科与知识模块</h2>
+              <p>按学科、地区、知识点、难度和题量生成本次练习</p>
+            </div>
+            <div id="configStatus" class="status-pill pending">正在检测 AI 配置</div>
+          </div>
+
+          <div class="control-grid">
+            <label>
+              <span>学科</span>
+              <select id="subjectSelect"></select>
+            </label>
+            <label>
+              <span>地区</span>
+              <input type="text" id="regionInput" value="中国江苏省南京市" />
+            </label>
+            <label>
+              <span>年级</span>
+              <input type="text" id="gradeInput" value="初三" />
+            </label>
+            <label>
+              <span>教材版本</span>
+              <input type="text" id="editionInput" value="苏教版（江苏凤凰科技出版社）" placeholder="例如：苏科版 / 人教版" />
+            </label>
+            <label>
+              <span>知识点</span>
+              <select id="topicSelect"></select>
+            </label>
+            <label>
+              <span>难度</span>
+              <select id="difficultySelect">
+                <option value="基础">基础</option>
+                <option value="提升" selected>提升</option>
+                <option value="冲刺">冲刺</option>
+              </select>
+            </label>
+            <label>
+              <span>题量</span>
+              <select id="countSelect">
+                <option value="3">3 题</option>
+                <option value="5" selected>5 题</option>
+                <option value="8">8 题</option>
+              </select>
+            </label>
+          </div>
+
+          <button id="generateBtn" class="primary-btn">生成题目</button>
+          <p id="serverHint" class="note"></p>
+        </section>
+
+        <section class="card sidebar">
+          <h2>学科知识模块</h2>
+          <div id="topicPreview" class="topic-preview"></div>
+        </section>
+
+        <section class="card content">
+          <div class="title-row">
+            <div>
+              <h2>2. 在线测试</h2>
+              <p>答题后自动评分，并展示答案与解题思路</p>
+            </div>
+            <button id="submitBtn" class="secondary-btn">提交并评分</button>
+          </div>
+          <div id="quizContainer" class="empty-state">请先生成题目。</div>
+          <div id="resultContainer" class="result hidden"></div>
+        </section>
+
+        <section class="card content">
+          <div class="title-row">
+            <div>
+              <h2>3. 错题集</h2>
+              <p>可选择错题并生成同知识点类似题</p>
+            </div>
+            <button id="retryBtn" class="primary-btn light-btn">生成相似题</button>
+          </div>
+          <div id="wrongBookContainer" class="empty-state">暂无错题。</div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
