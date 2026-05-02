@@ -42,7 +42,11 @@ p { margin: 0; }
 .title-row, .action-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .title-row { margin-bottom: 18px; }
 .action-row { align-items: center; flex-wrap: wrap; }
+.form-section { margin-bottom: 18px; }
+.section-heading { margin-bottom: 12px; }
+.section-heading h3 { margin-bottom: 4px; }
 .control-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+.compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 label span { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 700; }
 input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 15px; background: white; }
 textarea { resize: vertical; }
@@ -93,6 +97,6 @@ button:disabled { cursor: not-allowed; opacity: .7; }
 .result { margin-top: 16px; padding: 18px; border-radius: 18px; background: #eff6ff; border: 1px solid #bfdbfe; }
 .wrong-book-toolbar { margin-bottom: 14px; display: flex; justify-content: flex-start; }
 .wrong-book-toolbar label { min-width: 240px; }
-@media (max-width: 1180px) { .control-grid, .paper-summary, .topic-checkbox-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 1180px) { .control-grid, .paper-summary, .topic-checkbox-grid, .compact-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 980px) { .hero, .title-row { flex-direction: column; align-items: flex-start; } }
-@media (max-width: 640px) { .control-grid, .paper-summary, .topic-checkbox-grid { grid-template-columns: 1fr; } .summary-chip.wide { grid-column: span 1; } .action-row, .wrong-book-toolbar label { width: 100%; } .hero { padding: 22px; } h1 { font-size: 32px; } .pick-box { flex-wrap: wrap; } .topic-selector-head { flex-direction: column; align-items: flex-start; } }
+@media (max-width: 640px) { .control-grid, .paper-summary, .topic-checkbox-grid, .compact-grid { grid-template-columns: 1fr; } .summary-chip.wide { grid-column: span 1; } .action-row, .wrong-book-toolbar label { width: 100%; } .hero { padding: 22px; } h1 { font-size: 32px; } .pick-box { flex-wrap: wrap; } .topic-selector-head { flex-direction: column; align-items: flex-start; } }

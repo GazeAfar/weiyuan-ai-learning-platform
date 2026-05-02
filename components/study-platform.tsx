@@ -303,9 +303,9 @@ export function StudyPlatform() {
           <p className="hero-text">面向南京初三学生，先上线物理，后续可扩展数学等学科，并按地区教材与中考风格生成训练内容。</p>
         </div>
         <div className="hero-side">
-          <div className="hero-chip">真实 AI 出题</div>
-          <div className="hero-chip">错题强化训练</div>
-          <div className="hero-chip">打印线下练习</div>
+          <div className="hero-chip">智能练习</div>
+          <div className="hero-chip">错题巩固</div>
+          <div className="hero-chip">打印练习</div>
         </div>
       </header>
 
@@ -313,17 +313,12 @@ export function StudyPlatform() {
         <section className="card full">
           <div className="title-row">
             <div>
-              <h2>1. 选择学科与知识模块</h2>
-              <p>按学科、地区、知识点、模式、难度和题量生成本次练习</p>
+              <h2>选择想练的内容</h2>
+              <p>选好科目、知识点、题量后，就可以开始练习。</p>
             </div>
-            <div className={`status-pill ${statusTone}`}>{statusText}</div>
           </div>
 
           <div className="form-section">
-            <div className="section-heading">
-              <h3>第一步：组卷范围</h3>
-              <p>先决定学科、模式，再勾选知识点。</p>
-            </div>
             <div className="control-grid compact-grid">
               <label>
                 <span>学科</span>
@@ -345,10 +340,6 @@ export function StudyPlatform() {
           </div>
 
           <div className="form-section">
-            <div className="section-heading">
-              <h3>第二步：组卷参数</h3>
-              <p>再设置地区、教材、难度和题量。</p>
-            </div>
             <div className="control-grid">
               <label><span>地区</span><input value={region} onChange={(e) => setRegion(e.target.value)} /></label>
               <label><span>年级</span><input value={grade} onChange={(e) => setGrade(e.target.value)} /></label>
@@ -374,14 +365,14 @@ export function StudyPlatform() {
           </div>
 
           {!subjectData?.enabled && <div className="subject-status">{subject} 当前为“即将上线”状态，建议先使用物理。</div>}
-          {mode === 'common_sense' && <div className="subject-status info">当前为生活常识专项：以生活化选择题为主，搭配少量单位填空题。</div>}
+          {mode === 'common_sense' && <div className="subject-status info">生活常识专项会更偏基础判断题，适合专门查漏补缺。</div>}
           <div className="topic-selector-card">
             <div className="topic-selector-head">
               <div>
-                <strong>知识点勾选（按模块）</strong>
+                <strong>选择知识点</strong>
                 <p className="note">已选 {selectedTopics.length} 个知识点{selectedTopics.length === topics.length && topics.length > 0 ? '（当前为所有知识点）' : ''}。</p>
               </div>
-              <button type="button" className="text-btn" onClick={selectAllTopics}>全选知识点</button>
+              <button type="button" className="text-btn" onClick={selectAllTopics}>全选</button>
             </div>
             <div className="topic-preview compact">
               {subjectData?.modules.length ? subjectData.modules.map((module) => (
@@ -404,20 +395,24 @@ export function StudyPlatform() {
             </div>
           </div>
           <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled || !selectedTopics.length}>{isGenerating ? '正在生成...' : '生成题目'}</button>
-          <p className="note">{serverHint}</p>
         </section>
 
         <section className="card content">
           <div className="title-row">
             <div>
-              <h2>2. 在线测试 / 试卷生成</h2>
-              <p>网页可在线作答；画图题、实验题、整卷模拟更建议打印线下完成</p>
+              <h2>开始做题</h2>
+              <p>选择题、填空题可以直接在线做；画图题、实验题更适合打印后完成。</p>
             </div>
             <div className="action-row">
               <button className="secondary-btn subtle-btn" onClick={() => toggleSelectAll(selectedQuestionIds.length !== currentQuestions.length)} disabled={!currentQuestions.length}>{selectedQuestionIds.length === currentQuestions.length && currentQuestions.length ? '取消全选' : '全选题目'}</button>
               <button className="secondary-btn" onClick={printSelectedQuestions} disabled={!currentQuestions.length}>打印试卷 / PDF</button>
               <button className="secondary-btn" onClick={printSelectedAnswers} disabled={!currentQuestions.length}>打印答案解析 / PDF</button>
-              <button className="secondary-btn" onClick={submitQuiz} disabled={!currentQuestions.length}>提交并评分</button>
+              <button className="secondary-btn" onClick={() => {
+                if (!currentQuestions.length) return;
+                if (window.confirm('确认提交并评分吗？提交后将立即显示答案和解析。')) {
+                  submitQuiz();
+                }
+              }} disabled={!currentQuestions.length}>提交并评分</button>
             </div>
           </div>
 
