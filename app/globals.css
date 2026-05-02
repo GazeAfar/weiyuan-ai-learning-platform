@@ -30,6 +30,7 @@ h2 { margin: 0 0 6px; font-size: 24px; }
 h3 { margin: 0 0 10px; font-size: 17px; }
 p { margin: 0; }
 .hero-text, .note, .title-row p, .question-meta, .analysis, .module-card p { color: var(--muted); line-height: 1.7; }
+.error-text { color: #b42318; }
 .hero-side { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
 .hero-chip, .status-pill { padding: 10px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; }
 .hero-chip { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }

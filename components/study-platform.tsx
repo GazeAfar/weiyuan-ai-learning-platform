@@ -56,9 +56,9 @@ export function StudyPlatform() {
   const [region, setRegion] = useState('中国江苏省南京市');
   const [grade, setGrade] = useState('初三');
   const [edition, setEdition] = useState('苏教版');
-  const [serverHint, setServerHint] = useState('正在检测 AI 配置');
+  const [serverHint, setServerHint] = useState('');
   const [statusTone, setStatusTone] = useState<'pending' | 'ok' | 'error'>('pending');
-  const [statusText, setStatusText] = useState('正在检测 AI 配置');
+  const [statusText, setStatusText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -87,18 +87,18 @@ export function StudyPlatform() {
         setSelectedTopics(topics[0] ? [topics[0]] : []);
         if (data.configured) {
           setStatusTone('ok');
-          setStatusText(`AI 已连接 · ${data.model}`);
-          setServerHint('已检测到 AI 配置，可以按地区和知识点生成真题。');
+          setStatusText('');
+          setServerHint('');
         } else {
           setStatusTone('error');
-          setStatusText('AI 未配置');
-          setServerHint('请先配置 OPENAI_API_KEY，再启动服务。');
+          setStatusText('');
+          setServerHint('当前题目生成功能还不能使用，请先检查接口配置。');
         }
       })
       .catch((error) => {
         setStatusTone('error');
-        setStatusText('服务异常');
-        setServerHint(`配置读取失败：${error.message}`);
+        setStatusText('');
+        setServerHint(`页面初始化失败：${error.message}`);
       });
   }, []);
 
@@ -134,48 +134,61 @@ export function StudyPlatform() {
 
   async function generateQuestions() {
     if (!subjectData?.enabled) return;
-    setIsGenerating(true);
-    setResult(null);
-    setQuizSubmitted(false);
-
-    const effectiveTopics = selectedTopics.length === topics.length ? '__all__' : selectedTopics;
-    const effectiveTopicLabel = selectedTopics.length === topics.length ? '__all__' : (selectedTopics[0] || topic);
-
-    const res = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject, topic: effectiveTopicLabel, topics: effectiveTopics, difficulty, count: Number(count), region, grade, edition, mode }),
-    });
-    const data = await res.json();
-    setIsGenerating(false);
-
-    if (!data.ok) {
-      setCurrentQuestions([]);
-      setSelectedQuestionIds([]);
-      setServerHint(`生成失败：${data.error}`);
+    if (!selectedTopics.length) {
+      setServerHint('请先勾选至少一个知识点。');
       return;
     }
 
-    const next = data.questions.map((item: Omit<Question, 'subject' | 'topic' | 'localId' | 'collected' | 'isWrong'>, index: number) => ({
-      ...item,
-      subject,
-      topic: selectedTopics.length === topics.length ? (item.points?.[0] || '所有知识点') : (selectedTopics.length > 1 ? (item.points?.[0] || '多知识点') : (selectedTopics[0] || item.points?.[0] || '未标注')),
-      localId: `${Date.now()}-${index}`,
-      collected: false,
-      isWrong: false,
-    }));
+    setIsGenerating(true);
+    setServerHint('正在生成题目，请稍等...');
+    setResult(null);
+    setQuizSubmitted(false);
 
-    setAnswers({});
-    setCurrentQuestions(next);
-    setSelectedQuestionIds(next.map((item: Question) => item.localId));
-    setCurrentPaperMeta({
-      subject,
-      topic: selectedTopics.length === topics.length ? '所有知识点' : selectedTopics.length > 1 ? selectedTopics.join('、') : (selectedTopics[0] || topic),
-      difficulty,
-      count,
-      edition,
-      mode: mode === 'regular' ? '常规练习' : '生活常识专项',
-    });
+    try {
+      const effectiveTopics = selectedTopics.length === topics.length ? '__all__' : selectedTopics;
+      const effectiveTopicLabel = selectedTopics.length === topics.length ? '__all__' : (selectedTopics[0] || topic);
+
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject, topic: effectiveTopicLabel, topics: effectiveTopics, difficulty, count: Number(count), region, grade, edition, mode }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        setCurrentQuestions([]);
+        setSelectedQuestionIds([]);
+        setServerHint(`生成失败：${data.error}`);
+        return;
+      }
+
+      const next = data.questions.map((item: Omit<Question, 'subject' | 'topic' | 'localId' | 'collected' | 'isWrong'>, index: number) => ({
+        ...item,
+        subject,
+        topic: selectedTopics.length === topics.length ? (item.points?.[0] || '所有知识点') : (selectedTopics.length > 1 ? (item.points?.[0] || '多知识点') : (selectedTopics[0] || item.points?.[0] || '未标注')),
+        localId: `${Date.now()}-${index}`,
+        collected: false,
+        isWrong: false,
+      }));
+
+      setAnswers({});
+      setCurrentQuestions(next);
+      setSelectedQuestionIds(next.map((item: Question) => item.localId));
+      setCurrentPaperMeta({
+        subject,
+        topic: selectedTopics.length === topics.length ? '所有知识点' : selectedTopics.length > 1 ? selectedTopics.join('、') : (selectedTopics[0] || topic),
+        difficulty,
+        count,
+        edition,
+        mode: mode === 'regular' ? '常规练习' : '生活常识专项',
+      });
+      setServerHint('');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '请求失败，请稍后重试。';
+      setServerHint(`生成失败：${message}`);
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   function submitQuiz() {
@@ -300,7 +313,6 @@ export function StudyPlatform() {
         <div>
           <p className="eyebrow">南京初三同步练习</p>
           <h1>微远AI学习平台</h1>
-          <p className="hero-text">先练物理，贴合南京初三和苏教版内容。选好知识点后，就能直接生成练习题。</p>
         </div>
         <div className="hero-side">
           <div className="hero-chip">智能练习</div>
@@ -396,7 +408,8 @@ export function StudyPlatform() {
               )) : <div className="module-card pending-card"><h3>该学科即将上线</h3><p>知识点和题型正在整理中。</p></div>}
             </div>
           </div>
-          <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled || !selectedTopics.length}>{isGenerating ? '正在生成题目...' : '开始生成题目'}</button>
+          <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled}>{isGenerating ? '正在生成题目...' : '开始生成题目'}</button>
+          {!!serverHint && <p className={`note ${serverHint.includes('失败') ? 'error-text' : ''}`}>{serverHint}</p>}
         </section>
 
         <section className="card content">
