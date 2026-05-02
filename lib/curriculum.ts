@@ -59,6 +59,19 @@ export function sanitizeTopic(subject: string, topic?: string) {
   return topics.includes(topic ?? '') ? (topic as string) : topics[0] ?? '';
 }
 
+export function sanitizeTopics(subject: string, topics?: string[] | string) {
+  const available = getSubjectTopics(subject);
+  if (topics === '__all__') return available;
+  if (Array.isArray(topics)) {
+    const picked = topics.filter((item) => available.includes(item));
+    return picked.length ? picked : available.slice(0, 1);
+  }
+  if (typeof topics === 'string' && topics) {
+    return available.includes(topics) ? [topics] : available.slice(0, 1);
+  }
+  return available.slice(0, 1);
+}
+
 export function sanitizeDifficulty(difficulty?: string) {
   return ['基础', '提升', '冲刺'].includes(difficulty ?? '') ? (difficulty as string) : '提升';
 }

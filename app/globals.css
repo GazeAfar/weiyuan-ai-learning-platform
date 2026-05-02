@@ -64,6 +64,10 @@ button:disabled { cursor: not-allowed; opacity: .7; }
 .topic-preview { display: grid; gap: 14px; }
 .module-card { padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: #f8fbff; }
 .pending-card { background: #fafcff; }
+.topic-selector-card { margin: 16px 0 18px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: #f8fbff; }
+.topic-selector-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.topic-checkbox-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.topic-check-item { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: white; }
 .topic-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .topic-chip { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); background: white; color: #334155; font-size: 13px; font-weight: 600; }
 .topic-chip.active { background: var(--primary-soft); border-color: #93c5fd; color: var(--primary); }
@@ -89,6 +93,6 @@ button:disabled { cursor: not-allowed; opacity: .7; }
 .result { margin-top: 16px; padding: 18px; border-radius: 18px; background: #eff6ff; border: 1px solid #bfdbfe; }
 .wrong-book-toolbar { margin-bottom: 14px; display: flex; justify-content: flex-start; }
 .wrong-book-toolbar label { min-width: 240px; }
-@media (max-width: 1180px) { .control-grid, .paper-summary { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 1180px) { .control-grid, .paper-summary, .topic-checkbox-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .hero, .title-row { flex-direction: column; align-items: flex-start; } }
-@media (max-width: 640px) { .control-grid, .paper-summary { grid-template-columns: 1fr; } .summary-chip.wide { grid-column: span 1; } .action-row, .wrong-book-toolbar label { width: 100%; } .hero { padding: 22px; } h1 { font-size: 32px; } .pick-box { flex-wrap: wrap; } }
+@media (max-width: 640px) { .control-grid, .paper-summary, .topic-checkbox-grid { grid-template-columns: 1fr; } .summary-chip.wide { grid-column: span 1; } .action-row, .wrong-book-toolbar label { width: 100%; } .hero { padding: 22px; } h1 { font-size: 32px; } .pick-box { flex-wrap: wrap; } .topic-selector-head { flex-direction: column; align-items: flex-start; } }

@@ -22,6 +22,7 @@ export function getAiConfig() {
 export async function createQuestions(params: {
   subject: string;
   topic: string;
+  topics?: string[];
   count: number;
   difficulty: string;
   region: string;
@@ -64,6 +65,8 @@ export async function createQuestions(params: {
       '至少包含 1 道选择题和 1 道计算/分析题（如果 count >= 4）。',
       '如果 mode=regular，保持正常卷型结构，不要刻意提高生活常识题比例。',
       '如果 mode=common_sense，集中生成生活常识专项题。',
+      '如果提供了 topics 数组，表示应围绕这些知识点混合组卷，而不是只按单一知识点出题。',
+      '如果 mode=common_sense 且 topic=__all__ 或 topics 覆盖全部知识点，表示可从当前学科所有相关知识点中抽取生活常识题。',
       '当 mode=common_sense 时，题目以选择题为主，可搭配少量单位填空题。',
       '当 mode=common_sense 时，应优先使用生活中的真实场景、常见数据范围和典型物理量数量级。',
       '如果是生活常识类填空题，优先考查单位填写，例如长度、质量、速度、功率、电压、电流等单位。',

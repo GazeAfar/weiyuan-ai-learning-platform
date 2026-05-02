@@ -49,6 +49,7 @@ export function StudyPlatform() {
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [subject, setSubject] = useState('物理');
   const [topic, setTopic] = useState('');
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [difficulty, setDifficulty] = useState('提升');
   const [count, setCount] = useState('5');
   const [mode, setMode] = useState<'regular' | 'common_sense'>('regular');
@@ -83,6 +84,7 @@ export function StudyPlatform() {
         setEdition(data.curriculum.subjects[firstSubject]?.edition || '待补充');
         const topics = data.curriculum.subjects[firstSubject]?.modules.flatMap((m) => m.topics) || [];
         setTopic(topics[0] || '');
+        setSelectedTopics(topics[0] ? [topics[0]] : []);
         if (data.configured) {
           setStatusTone('ok');
           setStatusText(`AI 已连接 · ${data.model}`);
@@ -106,6 +108,7 @@ export function StudyPlatform() {
 
   const subjectData = config?.curriculum.subjects[subject];
   const topics = useMemo(() => subjectData?.modules.flatMap((m) => m.topics) || [], [subjectData]);
+  const topicOptions = useMemo(() => [{ value: '__all__', label: '所有知识点' }, ...topics.map((item) => ({ value: item, label: item }))], [topics]);
   const wrongBookTopics = useMemo(() => [...new Set(wrongBook.map((item) => item.topic).filter(Boolean))], [wrongBook]);
   const filteredWrongBook = useMemo(
     () => (wrongBookFilter === '__all__' ? wrongBook : wrongBook.filter((item) => item.topic === wrongBookFilter)),
@@ -116,9 +119,10 @@ export function StudyPlatform() {
     if (subjectData) {
       setEdition(subjectData.edition || edition);
       const nextTopics = subjectData.modules.flatMap((m) => m.topics);
-      setTopic(nextTopics[0] || '');
+      setTopic(mode === 'common_sense' ? '__all__' : nextTopics[0] || '');
+      setSelectedTopics(mode === 'common_sense' ? nextTopics : (nextTopics[0] ? [nextTopics[0]] : []));
     }
-  }, [subject]);
+  }, [subject, mode]);
 
   function updateAnswer(key: string, value: string) {
     setAnswers((prev) => ({ ...prev, [key]: value }));
@@ -134,10 +138,13 @@ export function StudyPlatform() {
     setResult(null);
     setQuizSubmitted(false);
 
+    const effectiveTopics = selectedTopics.length === topics.length ? '__all__' : selectedTopics;
+    const effectiveTopicLabel = selectedTopics.length === topics.length ? '__all__' : (selectedTopics[0] || topic);
+
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject, topic, difficulty, count: Number(count), region, grade, edition, mode }),
+      body: JSON.stringify({ subject, topic: effectiveTopicLabel, topics: effectiveTopics, difficulty, count: Number(count), region, grade, edition, mode }),
     });
     const data = await res.json();
     setIsGenerating(false);
@@ -152,7 +159,7 @@ export function StudyPlatform() {
     const next = data.questions.map((item: Omit<Question, 'subject' | 'topic' | 'localId' | 'collected' | 'isWrong'>, index: number) => ({
       ...item,
       subject,
-      topic,
+      topic: selectedTopics.length === topics.length ? (item.points?.[0] || '所有知识点') : (selectedTopics.length > 1 ? (item.points?.[0] || '多知识点') : (selectedTopics[0] || item.points?.[0] || '未标注')),
       localId: `${Date.now()}-${index}`,
       collected: false,
       isWrong: false,
@@ -163,7 +170,7 @@ export function StudyPlatform() {
     setSelectedQuestionIds(next.map((item: Question) => item.localId));
     setCurrentPaperMeta({
       subject,
-      topic,
+      topic: selectedTopics.length === topics.length ? '所有知识点' : selectedTopics.length > 1 ? selectedTopics.join('、') : (selectedTopics[0] || topic),
       difficulty,
       count,
       edition,
@@ -237,6 +244,22 @@ export function StudyPlatform() {
     setSelectedQuestionIds(checked ? currentQuestions.map((item) => item.localId) : []);
   }
 
+  function toggleTopicSelection(value: string, checked: boolean) {
+    if (value === '__all__') {
+      setSelectedTopics(checked ? topics : []);
+      setTopic(checked ? '__all__' : '');
+      return;
+    }
+    const next = checked ? Array.from(new Set([...selectedTopics, value])) : selectedTopics.filter((item) => item !== value);
+    setSelectedTopics(next);
+    setTopic(next.length === topics.length ? '__all__' : (next[0] || ''));
+  }
+
+  function selectAllTopics() {
+    setSelectedTopics(topics);
+    setTopic('__all__');
+  }
+
   function printSelectedQuestions() {
     const selected = currentQuestions.filter((item) => selectedQuestionIds.includes(item.localId));
     if (!selected.length) {
@@ -303,9 +326,10 @@ export function StudyPlatform() {
             <label><span>年级</span><input value={grade} onChange={(e) => setGrade(e.target.value)} /></label>
             <label><span>教材版本</span><input value={edition} onChange={(e) => setEdition(e.target.value)} /></label>
             <label>
-              <span>知识点</span>
-              <select value={topic} onChange={(e) => setTopic(e.target.value)} disabled={!subjectData?.enabled}>
-                {topics.map((item) => <option key={item} value={item}>{item}</option>)}
+              <span>知识点范围</span>
+              <select value={selectedTopics.length === topics.length ? '__all__' : '__multi__'} onChange={(e) => e.target.value === '__all__' ? selectAllTopics() : undefined} disabled={!subjectData?.enabled}>
+                <option value="__multi__">已选 {selectedTopics.length || 0} 个知识点</option>
+                <option value="__all__">所有知识点</option>
               </select>
             </label>
             <label>
@@ -329,7 +353,25 @@ export function StudyPlatform() {
 
           {!subjectData?.enabled && <div className="subject-status">{subject} 当前为“即将上线”状态，建议先使用物理。</div>}
           {mode === 'common_sense' && <div className="subject-status info">当前为生活常识专项：以生活化选择题为主，搭配少量单位填空题。</div>}
-          <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled}>{isGenerating ? '正在生成...' : '生成题目'}</button>
+          <div className="topic-selector-card">
+            <div className="topic-selector-head">
+              <strong>知识点勾选</strong>
+              <button type="button" className="text-btn" onClick={selectAllTopics}>全选知识点</button>
+            </div>
+            <div className="topic-checkbox-grid">
+              {topicOptions.map((item) => (
+                <label key={item.value} className="topic-check-item">
+                  <input
+                    type="checkbox"
+                    checked={item.value === '__all__' ? selectedTopics.length === topics.length && topics.length > 0 : selectedTopics.includes(item.value)}
+                    onChange={(e) => toggleTopicSelection(item.value, e.target.checked)}
+                  />
+                  <span>{item.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled || !selectedTopics.length}>{isGenerating ? '正在生成...' : '生成题目'}</button>
           <p className="note">{serverHint}</p>
         </section>
 
@@ -340,7 +382,7 @@ export function StudyPlatform() {
               <section key={module.name} className="module-card">
                 <h3>{module.name}</h3>
                 <div className="topic-chip-list">
-                  {module.topics.map((item) => <button key={item} type="button" className={`topic-chip ${topic === item ? 'active' : ''}`} onClick={() => setTopic(item)}>{item}</button>)}
+                  {module.topics.map((item) => <button key={item} type="button" className={`topic-chip ${selectedTopics.includes(item) ? 'active' : ''}`} onClick={() => toggleTopicSelection(item, !selectedTopics.includes(item))}>{item}</button>)}
                 </div>
               </section>
             )) : <div className="module-card pending-card"><h3>该学科即将上线</h3><p>知识点和题型正在整理中。</p></div>}
