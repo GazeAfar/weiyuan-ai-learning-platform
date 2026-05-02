@@ -311,7 +311,6 @@ export function StudyPlatform() {
     <div className="shell">
       <header className="hero card">
         <div>
-          <p className="eyebrow">南京初三同步练习</p>
           <h1>微远AI学习平台</h1>
         </div>
         <div className="hero-side">
@@ -379,7 +378,7 @@ export function StudyPlatform() {
           </div>
 
           {!subjectData?.enabled && <div className="subject-status">{subject} 还在整理中，当前建议先使用物理。</div>}
-          {mode === 'common_sense' && <div className="subject-status info">这个模式主要出选择题，搭配少量单位填空题。</div>}
+
           <div className="topic-selector-card">
             <div className="topic-selector-head">
               <div>
