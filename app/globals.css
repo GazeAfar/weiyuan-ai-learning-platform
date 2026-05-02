@@ -36,10 +36,9 @@ p { margin: 0; }
 .status-pill.pending { background: #fff7ed; color: var(--warning); }
 .status-pill.ok { background: #f0fdf4; color: var(--success); }
 .status-pill.error { background: #fef2f2; color: var(--danger); }
-.layout { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
+.layout { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .full, .content { padding: 24px; }
 .full { grid-column: 1 / -1; }
-.sidebar { padding: 24px; height: fit-content; }
 .title-row, .action-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .title-row { margin-bottom: 18px; }
 .action-row { align-items: center; flex-wrap: wrap; }
@@ -62,6 +61,7 @@ button:disabled { cursor: not-allowed; opacity: .7; }
 .summary-chip span { font-weight: 700; }
 .summary-chip.wide { grid-column: span 2; }
 .topic-preview { display: grid; gap: 14px; }
+.topic-preview.compact { margin-top: 12px; }
 .module-card { padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: #f8fbff; }
 .pending-card { background: #fafcff; }
 .topic-selector-card { margin: 16px 0 18px; padding: 16px; border: 1px solid var(--line); border-radius: 18px; background: #f8fbff; }
@@ -94,5 +94,5 @@ button:disabled { cursor: not-allowed; opacity: .7; }
 .wrong-book-toolbar { margin-bottom: 14px; display: flex; justify-content: flex-start; }
 .wrong-book-toolbar label { min-width: 240px; }
 @media (max-width: 1180px) { .control-grid, .paper-summary, .topic-checkbox-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 980px) { .layout { grid-template-columns: 1fr; } .hero, .title-row { flex-direction: column; align-items: flex-start; } }
+@media (max-width: 980px) { .hero, .title-row { flex-direction: column; align-items: flex-start; } }
 @media (max-width: 640px) { .control-grid, .paper-summary, .topic-checkbox-grid { grid-template-columns: 1fr; } .summary-chip.wide { grid-column: span 1; } .action-row, .wrong-book-toolbar label { width: 100%; } .hero { padding: 22px; } h1 { font-size: 32px; } .pick-box { flex-wrap: wrap; } .topic-selector-head { flex-direction: column; align-items: flex-start; } }

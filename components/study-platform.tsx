@@ -369,38 +369,34 @@ export function StudyPlatform() {
           {mode === 'common_sense' && <div className="subject-status info">当前为生活常识专项：以生活化选择题为主，搭配少量单位填空题。</div>}
           <div className="topic-selector-card">
             <div className="topic-selector-head">
-              <strong>知识点勾选</strong>
+              <div>
+                <strong>知识点勾选（按模块）</strong>
+                <p className="note">在这里直接选单个、多个，或者全选所有知识点，不再分散到别的位置。</p>
+              </div>
               <button type="button" className="text-btn" onClick={selectAllTopics}>全选知识点</button>
             </div>
-            <div className="topic-checkbox-grid">
-              {topicOptions.map((item) => (
-                <label key={item.value} className="topic-check-item">
-                  <input
-                    type="checkbox"
-                    checked={item.value === '__all__' ? selectedTopics.length === topics.length && topics.length > 0 : selectedTopics.includes(item.value)}
-                    onChange={(e) => toggleTopicSelection(item.value, e.target.checked)}
-                  />
-                  <span>{item.label}</span>
-                </label>
-              ))}
+            <div className="topic-preview compact">
+              {subjectData?.modules.length ? subjectData.modules.map((module) => (
+                <section key={module.name} className="module-card">
+                  <h3>{module.name}</h3>
+                  <div className="topic-checkbox-grid">
+                    {module.topics.map((item) => (
+                      <label key={item} className="topic-check-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedTopics.includes(item)}
+                          onChange={(e) => toggleTopicSelection(item, e.target.checked)}
+                        />
+                        <span>{item}</span>
+                      </label>
+                    ))}
+                  </div>
+                </section>
+              )) : <div className="module-card pending-card"><h3>该学科即将上线</h3><p>知识点和题型正在整理中。</p></div>}
             </div>
           </div>
           <button className="primary-btn" onClick={generateQuestions} disabled={isGenerating || !subjectData?.enabled || !selectedTopics.length}>{isGenerating ? '正在生成...' : '生成题目'}</button>
           <p className="note">{serverHint}</p>
-        </section>
-
-        <section className="card sidebar">
-          <h2>学科知识模块</h2>
-          <div className="topic-preview">
-            {subjectData?.modules.length ? subjectData.modules.map((module) => (
-              <section key={module.name} className="module-card">
-                <h3>{module.name}</h3>
-                <div className="topic-chip-list">
-                  {module.topics.map((item) => <button key={item} type="button" className={`topic-chip ${selectedTopics.includes(item) ? 'active' : ''}`} onClick={() => toggleTopicSelection(item, !selectedTopics.includes(item))}>{item}</button>)}
-                </div>
-              </section>
-            )) : <div className="module-card pending-card"><h3>该学科即将上线</h3><p>知识点和题型正在整理中。</p></div>}
-          </div>
         </section>
 
         <section className="card content">

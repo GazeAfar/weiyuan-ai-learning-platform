@@ -78,5 +78,5 @@ export function sanitizeDifficulty(difficulty?: string) {
 
 export function clampCount(count?: number) {
   const value = Number(count) || 5;
-  return Math.min(10, Math.max(1, value));
+  return Math.min(30, Math.max(1, value));
 }
