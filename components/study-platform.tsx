@@ -180,7 +180,7 @@ export function StudyPlatform() {
         difficulty,
         count,
         edition,
-        mode: mode === 'regular' ? '常规练习' : '生活常识专项',
+        mode: mode === 'regular' ? '常规练习' : '常识题',
       });
       setServerHint('');
     } catch (error) {
@@ -345,7 +345,7 @@ export function StudyPlatform() {
                 <span>出题模式</span>
                 <select value={mode} onChange={(e) => setMode(e.target.value as 'regular' | 'common_sense')}>
                   <option value="regular">常规练习</option>
-                  <option value="common_sense">生活常识专项</option>
+                  <option value="common_sense">常识题</option>
                 </select>
               </label>
             </div>
@@ -379,7 +379,7 @@ export function StudyPlatform() {
           </div>
 
           {!subjectData?.enabled && <div className="subject-status">{subject} 还在整理中，当前建议先使用物理。</div>}
-          {mode === 'common_sense' && <div className="subject-status info">这个模式更适合练基础常识题，比如单位、估测、常见现象和科学家。</div>}
+          {mode === 'common_sense' && <div className="subject-status info">这个模式主要出选择题，搭配少量单位填空题。</div>}
           <div className="topic-selector-card">
             <div className="topic-selector-head">
               <div>
