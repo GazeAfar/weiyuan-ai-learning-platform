@@ -260,14 +260,16 @@ export function StudyPlatform() {
     setTopic('__all__');
   }
 
-  function printSelectedQuestions() {
+  function getSelectedQuestions() {
     const selected = currentQuestions.filter((item) => selectedQuestionIds.includes(item.localId));
     if (!selected.length) {
       alert('请先勾选至少一道题目。');
-      return;
+      return null;
     }
+    return selected;
+  }
 
-    const html = buildPrintHtml(selected, currentPaperMeta);
+  function openPrintWindow(html: string) {
     const win = window.open('', '_blank');
     if (!win) {
       alert('浏览器拦截了新窗口，请允许弹窗后重试。');
@@ -278,6 +280,18 @@ export function StudyPlatform() {
     win.document.close();
     win.focus();
     setTimeout(() => win.print(), 300);
+  }
+
+  function printSelectedQuestions() {
+    const selected = getSelectedQuestions();
+    if (!selected) return;
+    openPrintWindow(buildPaperHtml(selected, currentPaperMeta));
+  }
+
+  function printSelectedAnswers() {
+    const selected = getSelectedQuestions();
+    if (!selected) return;
+    openPrintWindow(buildAnswerHtml(selected, currentPaperMeta));
   }
 
   return (
@@ -397,7 +411,8 @@ export function StudyPlatform() {
             </div>
             <div className="action-row">
               <button className="secondary-btn subtle-btn" onClick={() => toggleSelectAll(selectedQuestionIds.length !== currentQuestions.length)} disabled={!currentQuestions.length}>{selectedQuestionIds.length === currentQuestions.length && currentQuestions.length ? '取消全选' : '全选题目'}</button>
-              <button className="secondary-btn" onClick={printSelectedQuestions} disabled={!currentQuestions.length}>生成打印版 / PDF</button>
+              <button className="secondary-btn" onClick={printSelectedQuestions} disabled={!currentQuestions.length}>打印试卷 / PDF</button>
+              <button className="secondary-btn" onClick={printSelectedAnswers} disabled={!currentQuestions.length}>打印答案解析 / PDF</button>
               <button className="secondary-btn" onClick={submitQuiz} disabled={!currentQuestions.length}>提交并评分</button>
             </div>
           </div>
@@ -519,7 +534,7 @@ export function StudyPlatform() {
   );
 }
 
-function buildPrintHtml(questions: Question[], meta: Record<string, string | number> | null) {
+function buildPaperHtml(questions: Question[], meta: Record<string, string | number> | null) {
   const body = questions.map((question, index) => `
     <section class="print-question">
       <h3>${index + 1}. ${escapeHtml(question.stem)}</h3>
@@ -529,22 +544,39 @@ function buildPrintHtml(questions: Question[], meta: Record<string, string | num
     </section>
   `).join('');
 
+  return buildPrintDocument('微远AI学习平台 · 打印试卷', meta, body);
+}
+
+function buildAnswerHtml(questions: Question[], meta: Record<string, string | number> | null) {
+  const body = questions.map((question, index) => `
+    <section class="print-question answer-sheet">
+      <h3>${index + 1}. ${escapeHtml(question.stem)}</h3>
+      <p class="meta">题型：${escapeHtml(labelType(question.type))}　知识点：${escapeHtml(question.topic)}</p>
+      <p><strong>标准答案：</strong>${escapeHtml(question.answer || '未提供')}</p>
+      <p><strong>解析：</strong>${escapeHtml(question.explanation || '未提供')}</p>
+    </section>
+  `).join('');
+
+  return buildPrintDocument('微远AI学习平台 · 答案解析页', meta, body);
+}
+
+function buildPrintDocument(title: string, meta: Record<string, string | number> | null, body: string) {
   return `<!doctype html>
   <html lang="zh-CN">
     <head>
       <meta charset="utf-8" />
-      <title>微远AI学习平台打印试卷</title>
+      <title>${title}</title>
       <style>
         body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111;padding:24px;line-height:1.7}
         h1{font-size:26px;margin-bottom:8px} h2{font-size:14px;color:#666;font-weight:normal;margin-top:0}
         .print-question{margin:20px 0;padding-bottom:18px;border-bottom:1px dashed #bbb;page-break-inside:avoid}
         .meta{font-size:12px;color:#666}.blank{height:90px;border-bottom:1px solid #bbb;margin-top:10px}
         .blank.tall{height:180px}.blank.drawing{height:220px;border:1px solid #bbb}.hint{font-size:12px;color:#666}
-        ul{padding-left:20px} @media print{body{padding:0 10mm}}
+        ul{padding-left:20px}.answer-sheet p{margin:8px 0} @media print{body{padding:0 10mm}}
       </style>
     </head>
     <body>
-      <h1>微远AI学习平台 · 打印试卷</h1>
+      <h1>${title}</h1>
       <h2>${meta ? `学科：${escapeHtml(String(meta.subject))} ｜ 知识点：${escapeHtml(String(meta.topic))} ｜ 模式：${escapeHtml(String(meta.mode))} ｜ 教材：${escapeHtml(String(meta.edition))}` : ''}</h2>
       ${body}
     </body>
