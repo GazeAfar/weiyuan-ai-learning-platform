@@ -153,6 +153,18 @@ function ensureConfigured() {
 }
 
 async function callModel(system: string, user: string) {
+  const mergedPrompt = [
+    '你必须遵守以下出题要求。',
+    '',
+    '【系统要求】',
+    system,
+    '',
+    '【用户需求】',
+    user,
+    '',
+    '请直接返回严格 JSON，不要输出 markdown，不要输出额外说明。',
+  ].join('\n');
+
   const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -164,8 +176,7 @@ async function callModel(system: string, user: string) {
       temperature: 0.7,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
+        { role: 'user', content: mergedPrompt },
       ],
     }),
   });
