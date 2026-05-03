@@ -565,7 +565,7 @@ function buildPaperHtml(questions: Question[], meta: Record<string, string | num
     </section>
   `).join('');
 
-  return buildPrintDocument('微远AI学习平台 · 打印试卷', meta, body);
+  return buildPrintDocument('微远AI学习平台 · 打印试卷', meta, `<div class="print-sheet">${body}</div>`);
 }
 
 function buildAnswerHtml(questions: Question[], meta: Record<string, string | number> | null) {
@@ -578,6 +578,8 @@ function buildAnswerHtml(questions: Question[], meta: Record<string, string | nu
     </section>
   `).join('');
 
+  return buildPrintDocument('微远AI学习平台 · 答案解析页', meta, `<div class="print-sheet answer-mode">${body}</div>`);
+
   return buildPrintDocument('微远AI学习平台 · 答案解析页', meta, body);
 }
 
@@ -588,19 +590,25 @@ function buildPrintDocument(title: string, meta: Record<string, string | number>
       <meta charset="utf-8" />
       <title>${title}</title>
       <style>
-        @page{size:A4;margin:10mm}
+        @page{size:A4;margin:8mm}
         *{box-sizing:border-box}
-        body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111;padding:14px;line-height:1.5;font-size:13px}
-        h1{font-size:22px;margin:0 0 6px} h2{font-size:12px;color:#666;font-weight:normal;margin:0 0 10px}
-        h3{font-size:15px;line-height:1.45;margin:0 0 6px}
-        .print-question{margin:10px 0;padding-bottom:10px;border-bottom:1px dashed #bbb;page-break-inside:avoid;break-inside:avoid}
-        .print-question.compact{margin:8px 0;padding-bottom:8px}
-        .meta{font-size:11px;color:#666;margin:6px 0 0}.blank{height:64px;border-bottom:1px solid #bbb;margin-top:8px}
-        .blank.tall{height:118px}.blank.drawing{height:150px;border:1px solid #bbb}.hint{font-size:11px;color:#666;margin:6px 0 0}
-        .option-list{padding-left:18px;margin:6px 0 0;column-count:2;column-gap:20px}
-        .option-list li{margin-bottom:4px;break-inside:avoid}
-        .answer-sheet p{margin:6px 0}
-        @media print{body{padding:0}.print-question{margin:8px 0;padding-bottom:8px}}
+        body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111;padding:10px;line-height:1.45;font-size:12px}
+        h1{font-size:20px;margin:0 0 4px} h2{font-size:11px;color:#666;font-weight:normal;margin:0 0 8px}
+        h3{font-size:14px;line-height:1.35;margin:0 0 4px}
+        .print-sheet{display:block}
+        .print-question{margin:8px 0;padding-bottom:8px;border-bottom:1px dashed #bbb;page-break-inside:avoid;break-inside:avoid}
+        .print-question.compact{margin:5px 0;padding-bottom:5px;line-height:1.3}
+        .print-question.compact h3{font-size:12px;line-height:1.28;margin-bottom:3px}
+        .print-question.compact .meta{font-size:10px;margin-top:3px}
+        .meta{font-size:11px;color:#666;margin:5px 0 0}.blank{height:58px;border-bottom:1px solid #bbb;margin-top:6px}
+        .blank.tall{height:110px}.blank.drawing{height:140px;border:1px solid #bbb}.hint{font-size:10px;color:#666;margin:4px 0 0}
+        .option-list{padding-left:16px;margin:4px 0 0;column-count:2;column-gap:16px}
+        .option-list li{margin-bottom:2px;break-inside:avoid}
+        .print-question.compact .option-list{margin-top:2px;padding-left:14px;column-gap:12px}
+        .print-question.compact .option-list li{margin-bottom:1px}
+        .answer-sheet p{margin:5px 0}
+        .answer-mode .print-question.compact h3{font-size:13px}
+        @media print{body{padding:0}.print-question{margin:6px 0;padding-bottom:6px}.print-question.compact{margin:4px 0;padding-bottom:4px}}
       </style>
     </head>
     <body>
