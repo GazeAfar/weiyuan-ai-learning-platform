@@ -52,6 +52,9 @@ label span { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 7
 input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 15px; background: white; }
 textarea { resize: vertical; }
 input[type="radio"], input[type="checkbox"] { width: auto; }
+.static-control > span { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 700; }
+.static-field { min-height: 48px; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: white; }
+.static-field strong { display: block; font-size: 15px; }
 button { border: none; border-radius: 14px; padding: 12px 18px; font-size: 15px; font-weight: 700; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .7; }
 .primary-btn { background: var(--primary); color: white; }

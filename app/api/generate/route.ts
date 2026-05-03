@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createQuestions } from '@/lib/ai';
-import { CURRICULUM, clampCount, sanitizeDifficulty, sanitizeSubject, sanitizeTopic, sanitizeTopics } from '@/lib/curriculum';
+import { CURRICULUM, clampCount, sanitizeDifficulty, sanitizeSubject, sanitizeTopics } from '@/lib/curriculum';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const subject = sanitizeSubject(body?.subject);
-    const mode = body?.mode || 'regular';
-    const topics = body?.topics === '__all__' || (mode === 'common_sense' && body?.topic === '__all__')
+    const requestedMode = body?.mode === 'common_sense' ? 'common_sense' : 'regular';
+    const mode = subject === '物理' ? requestedMode : 'regular';
+    const topics = body?.topics === '__all__' || (subject === '物理' && mode === 'common_sense' && body?.topic === '__all__')
       ? sanitizeTopics(subject, '__all__')
       : sanitizeTopics(subject, body?.topics ?? body?.topic);
     const topic = topics.length === 1 ? topics[0] : '__multi__';

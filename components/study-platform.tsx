@@ -117,12 +117,14 @@ export function StudyPlatform() {
 
   useEffect(() => {
     if (subjectData) {
-      setEdition(subjectData.edition || edition);
+      const nextMode = subject === '物理' ? mode : 'regular';
+      if (nextMode !== mode) setMode(nextMode);
+      setEdition(subjectData.edition || '待补充');
       const nextTopics = subjectData.modules.flatMap((m) => m.topics);
-      setTopic(mode === 'common_sense' ? '__all__' : nextTopics[0] || '');
-      setSelectedTopics(mode === 'common_sense' ? nextTopics : (nextTopics[0] ? [nextTopics[0]] : []));
+      setTopic(nextMode === 'common_sense' ? '__all__' : nextTopics[0] || '');
+      setSelectedTopics(nextMode === 'common_sense' ? nextTopics : (nextTopics[0] ? [nextTopics[0]] : []));
     }
-  }, [subject, mode]);
+  }, [subject, mode, subjectData]);
 
   function updateAnswer(key: string, value: string) {
     setAnswers((prev) => ({ ...prev, [key]: value }));
@@ -145,13 +147,14 @@ export function StudyPlatform() {
     setQuizSubmitted(false);
 
     try {
+      const requestMode = subject === '物理' ? mode : 'regular';
       const effectiveTopics = selectedTopics.length === topics.length ? '__all__' : selectedTopics;
       const effectiveTopicLabel = selectedTopics.length === topics.length ? '__all__' : (selectedTopics[0] || topic);
 
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, topic: effectiveTopicLabel, topics: effectiveTopics, difficulty, count: Number(count), region, grade, edition, mode }),
+        body: JSON.stringify({ subject, topic: effectiveTopicLabel, topics: effectiveTopics, difficulty, count: Number(count), region, grade, edition, mode: requestMode }),
       });
       const data = await res.json();
 
@@ -180,7 +183,7 @@ export function StudyPlatform() {
         difficulty,
         count,
         edition,
-        mode: mode === 'regular' ? '常规练习' : '常识题',
+        mode: labelMode(subject, requestMode),
       });
       setServerHint('');
     } catch (error) {
@@ -217,12 +220,19 @@ export function StudyPlatform() {
       alert('请至少选择一道错题。');
       return;
     }
+    const retrySubjects = Array.from(new Set(selected.map((item) => item.subject)));
+    if (retrySubjects.length > 1) {
+      alert('请选择同一学科的错题生成相似题。');
+      return;
+    }
+    const retrySubject = retrySubjects[0] || selected[0].subject;
+    const retryEdition = config?.curriculum.subjects[retrySubject]?.edition || edition;
 
     setIsRetrying(true);
     const res = await fetch('/api/regenerate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: selected[0].subject, region, grade, edition, selected }),
+      body: JSON.stringify({ subject: retrySubject, region, grade, edition: retryEdition, selected }),
     });
     const data = await res.json();
     setIsRetrying(false);
@@ -234,7 +244,7 @@ export function StudyPlatform() {
 
     const next = data.questions.map((item: Omit<Question, 'subject' | 'topic' | 'localId' | 'collected' | 'isWrong'>, index: number) => ({
       ...item,
-      subject: selected[0].subject,
+      subject: retrySubject,
       topic: item.points?.[0] || selected[index]?.topic || '相似题训练',
       localId: `retry-${Date.now()}-${index}`,
       collected: false,
@@ -246,7 +256,7 @@ export function StudyPlatform() {
     setResult(null);
     setCurrentQuestions(next);
     setSelectedQuestionIds(next.map((item: Question) => item.localId));
-    setCurrentPaperMeta({ subject: selected[0].subject, topic: '错题相似题强化', difficulty: '跟随错题难度', count: next.length, edition, mode: '错题重练' });
+    setCurrentPaperMeta({ subject: retrySubject, topic: '错题相似题强化', difficulty: '跟随错题难度', count: next.length, edition: retryEdition, mode: '错题重练' });
   }
 
   function toggleQuestionSelection(localId: string, checked: boolean) {
@@ -341,20 +351,33 @@ export function StudyPlatform() {
             <div className="control-grid compact-grid">
               <label>
                 <span>学科</span>
-                <select value={subject} onChange={(e) => setSubject(e.target.value)}>
+                <select value={subject} onChange={(e) => {
+                  const nextSubject = e.target.value;
+                  setSubject(nextSubject);
+                  if (nextSubject !== '物理') setMode('regular');
+                }}>
                   {config?.subjects.map((item) => {
                     const conf = config.curriculum.subjects[item];
                     return <option key={item} value={item} disabled={!conf.enabled}>{item}{conf.comingSoon ? '（即将上线）' : ''}</option>;
                   })}
                 </select>
               </label>
-              <label>
-                <span>出题模式</span>
-                <select value={mode} onChange={(e) => setMode(e.target.value as 'regular' | 'common_sense')}>
-                  <option value="regular">常规练习</option>
-                  <option value="common_sense">常识题</option>
-                </select>
-              </label>
+              {subject === '物理' ? (
+                <label>
+                  <span>出题模式</span>
+                  <select value={mode} onChange={(e) => setMode(e.target.value as 'regular' | 'common_sense')}>
+                    <option value="regular">常规练习</option>
+                    <option value="common_sense">常识题</option>
+                  </select>
+                </label>
+              ) : (
+                <div className="static-control">
+                  <span>出题类型</span>
+                  <div className="static-field">
+                    <strong>{labelMode(subject, 'regular')}</strong>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -423,7 +446,7 @@ export function StudyPlatform() {
           <div className="title-row">
             <div>
               <h2>开始练习</h2>
-              <p>选择题、填空题可以直接在线完成；画图题和实验题更适合打印后做。</p>
+              <p>{subject === '化学' ? '推断题可以在线作答，也可以打印后完成。' : '选择题、填空题可以直接在线完成；画图题和实验题更适合打印后做。'}</p>
             </div>
             <div className="action-row">
               <button className="secondary-btn subtle-btn" onClick={() => toggleSelectAll(selectedQuestionIds.length !== currentQuestions.length)} disabled={!currentQuestions.length}>{selectedQuestionIds.length === currentQuestions.length && currentQuestions.length ? '取消全选' : '全选本次题目'}</button>
@@ -484,7 +507,7 @@ export function StudyPlatform() {
                     ) : question.type === 'fill_blank' ? (
                       <input className="short-answer" value={answers[question.localId] || ''} onChange={(e) => updateAnswer(question.localId, e.target.value)} placeholder="请输入答案" />
                     ) : (
-                      <textarea rows={question.type.includes('experiment') ? 6 : 4} value={answers[question.localId] || ''} onChange={(e) => updateAnswer(question.localId, e.target.value)} placeholder={question.type === 'drawing' ? '此题更适合打印后作图，线上可简要描述。' : '请输入你的答案'} />
+                      <textarea rows={question.type.includes('experiment') || question.type === 'inference' ? 6 : 4} value={answers[question.localId] || ''} onChange={(e) => updateAnswer(question.localId, e.target.value)} placeholder={question.type === 'drawing' ? '此题更适合打印后作图，线上可简要描述。' : '请输入你的答案'} />
                     )}
 
                     <div className={`answer-block ${quizSubmitted ? 'show' : ''}`}>
@@ -619,7 +642,7 @@ function buildPrintDocument(title: string, meta: Record<string, string | number>
 function renderOfflineAnswerArea(type: string) {
   if (type === 'drawing') return '<p class="hint">请在线下完成作图。</p><div class="blank drawing"></div>';
   if (type === 'experiment_textbook' || type === 'experiment_innovative') return '<p class="hint">请在线下完成实验分析作答。</p><div class="blank tall"></div>';
-  if (type === 'calculation' || type === 'short_answer') return '<div class="blank tall"></div>';
+  if (type === 'calculation' || type === 'short_answer' || type === 'inference') return '<div class="blank tall"></div>';
   if (type === 'fill_blank') return '<div class="blank"></div>';
   return '';
 }
@@ -638,7 +661,13 @@ function labelType(type: string) {
     experiment_innovative: '创新实验题',
     calculation: '计算题',
     short_answer: '简答题',
+    inference: '推断题',
   }[type] || '题目';
+}
+
+function labelMode(subject: string, mode: string) {
+  if (subject === '化学') return '推断题';
+  return mode === 'regular' ? '常规练习' : '常识题';
 }
 
 function extractOptionValue(optionText: string, index: number) {
