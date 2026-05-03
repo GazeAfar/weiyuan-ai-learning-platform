@@ -53,7 +53,7 @@ export function StudyPlatform() {
   const [difficulty, setDifficulty] = useState('提升');
   const [count, setCount] = useState('5');
   const [mode, setMode] = useState<'regular' | 'common_sense'>('regular');
-  const [region, setRegion] = useState('中国江苏省南京市');
+  const [region, setRegion] = useState('江苏省南京市');
   const [grade, setGrade] = useState('初三');
   const [edition, setEdition] = useState('苏教版');
   const [serverHint, setServerHint] = useState('');

@@ -1,3 +1,5 @@
+import { getSubjectConfig } from '@/lib/curriculum';
+
 type GeneratedQuestion = {
   id: string;
   type: string;
@@ -32,6 +34,7 @@ export async function createQuestions(params: {
   mode?: string;
 }) {
   ensureConfigured();
+  const coveragePlan = buildCoveragePlan(params);
 
   const system = [
     '你是一名中国初中命题老师。',
@@ -39,6 +42,8 @@ export async function createQuestions(params: {
     '题目必须围绕指定知识点，难度适中偏中考风格。',
     '请优先贴合当地常见教材进度与考查方式。',
     '对于物理中的常识题，要大量结合生活场景、常见数量级和常见单位。',
+    '如果是物理学科，请严格按江苏省南京市初三、苏教版、当前中考范围命题。',
+    '不得引入超纲内容，不得出现高中化表达或超出初中要求的换算。',
     '如果是物理学科，请参考中考常见卷型结构来分配题型难度。',
     '输出必须是严格 JSON，不要出现 markdown 代码块。',
   ].join(' ');
@@ -62,15 +67,22 @@ export async function createQuestions(params: {
       '物理题型优先覆盖：选择题、填空题、画图题、实验题、计算题。',
       '实验题分为两类：书本实验题、创新实验题。',
       '必须严格按照 count 指定的题目数量输出，不能少题，不能多题。',
+      '必须严格控制在江苏省南京市初三物理常见考查范围内。',
+      '严禁生成超纲内容，例如：频率单位换算、开尔文K及摄氏温度与开尔文换算、明显偏高中化的概念或公式。',
       '如果题量较多，请尽量模拟中考卷型分布：前面的选择题偏基础，后段选择题可更综合、更难。',
       '如果用户要求 15 道左右的整卷风格，可参考“1~12 相对基础，13~15 更综合更难”的结构。',
       '至少包含 1 道选择题和 1 道计算/分析题（如果 count >= 4）。',
       '如果 mode=regular，保持正常卷型结构，不要刻意提高生活常识题比例。',
+      '如果 mode=regular 且提供了多个知识点，应显式提高综合题比例，至少部分题目融合2到3个相关知识点，不要几乎每题只考一个孤立知识点。',
+      '如果 mode=regular 且 topics 较多，要尽量覆盖声、热、光、力、电中的代表性考点；若 topics 中包含功和机械能、功率、电功率等内容，必须体现这些考点。',
       '如果 mode=common_sense，集中生成物理中考前1~5题那种送分性质的基础常识题。',
       '如果提供了 topics 数组，表示应围绕这些知识点混合组卷，而不是只按单一知识点出题。',
-      '如果 mode=common_sense 且 topic=__all__ 或 topics 覆盖全部知识点，表示可从当前学科所有相关知识点中抽取基础物理常识题。',
+      '如果提供了 question_blueprint，必须逐题遵守该蓝图，保证每一道题都对应指定的知识点覆盖要求，不要自行忽略。',
+      '如果 mode=common_sense 且 topic=__all__ 或 topics 覆盖全部知识点，表示题目应尽量广覆盖当前学科各模块，尤其不能漏掉功和机械能、功率、电功率、热学、电学、光学、力学等代表性内容。',
+      '如果 mode=common_sense 且 topic=__all__ 或 topics 覆盖全部知识点，并且 count >= 12，必须让大多数主要模块都至少出现1题；如果 count >= 18，应尽量让几乎所有已选知识点或对应模块都得到体现。',
       '当 mode=common_sense 时，不要把普通知识点题、计算题、实验分析题、画图题伪装成常识题。',
       '当 mode=common_sense 时，题目应主要考查基础物理量、常见单位、生活中的典型数值估测、常见物理现象判断、基础仪器用途、知名物理学家及其代表贡献。',
+      '当 mode=common_sense 时，也要适度加入更灵活的生活情境题，可在一道题里自然融合两个彼此相关的基础知识点，但整体仍应易于初三学生作答。',
       '当 mode=common_sense 时，只允许生成两类题：single_choice 和 fill_blank。',
       '当 mode=common_sense 时，必须以选择题为绝对主体，大部分题目都应为 single_choice。',
       '当 mode=common_sense 时，fill_blank 只能作为少量补充，且应优先考查单位填写，不要扩展成普通填空题。',
@@ -84,9 +96,102 @@ export async function createQuestions(params: {
       '答案必须明确可判分。',
       '不要重复题目。',
     ],
+    question_blueprint: coveragePlan,
   };
 
   return await callModelAndParse(system, JSON.stringify(user));
+}
+
+type CoverageBlueprintItem = {
+  no: number;
+  preferredType: 'single_choice' | 'fill_blank' | 'mixed';
+  focusTopics: string[];
+  intent: string;
+};
+
+function buildCoveragePlan(params: {
+  subject: string;
+  topics?: string[];
+  count: number;
+  mode?: string;
+}) {
+  const selectedTopics = (params.topics || []).filter(Boolean);
+  if (!selectedTopics.length) return [];
+
+  const moduleGroups = getSubjectConfig(params.subject).modules
+    .map((module) => ({
+      module: module.name,
+      topics: module.topics.filter((topic) => selectedTopics.includes(topic)),
+    }))
+    .filter((module) => module.topics.length);
+
+  if (!moduleGroups.length) return [];
+
+  const blueprints: CoverageBlueprintItem[] = [];
+  const add = (preferredType: CoverageBlueprintItem['preferredType'], focusTopics: string[], intent: string) => {
+    if (blueprints.length >= params.count) return;
+    blueprints.push({
+      no: blueprints.length + 1,
+      preferredType,
+      focusTopics,
+      intent,
+    });
+  };
+
+  const isCommonSense = params.mode === 'common_sense';
+
+  for (const topic of selectedTopics) {
+    add(
+      isCommonSense ? 'single_choice' : 'mixed',
+      [topic],
+      isCommonSense ? '基础生活常识覆盖，确保该知识点至少出现一次。' : '单知识点基础覆盖。',
+    );
+  }
+
+  const modulePairs = moduleGroups.flatMap((module) => {
+    const pairs: string[][] = [];
+    for (let i = 0; i < module.topics.length - 1; i += 1) {
+      pairs.push([module.topics[i], module.topics[i + 1]]);
+    }
+    if (module.topics.length >= 3) {
+      pairs.push([module.topics[0], module.topics[module.topics.length - 1]]);
+    }
+    return pairs.map((focusTopics) => ({ module: module.module, focusTopics }));
+  });
+
+  for (const pair of modulePairs) {
+    add(
+      isCommonSense ? 'single_choice' : 'mixed',
+      pair.focusTopics,
+      isCommonSense
+        ? `生活情境综合题，融合 ${pair.focusTopics.join('、')} 两个相关知识点。`
+        : `综合题，融合 ${pair.focusTopics.join('、')}。`,
+    );
+  }
+
+  const priorityTopics = ['功和机械能', '功率', '电功率', '物态变化', '机械运动', '压强', '浮力', '欧姆定律'];
+  for (const topic of priorityTopics) {
+    if (selectedTopics.includes(topic)) {
+      add(
+        isCommonSense ? 'single_choice' : 'mixed',
+        [topic],
+        isCommonSense ? '重点考点复现，防止核心知识点缺失。' : '重点考点强化。',
+      );
+    }
+  }
+
+  while (blueprints.length < params.count) {
+    const topic = selectedTopics[blueprints.length % selectedTopics.length];
+    const neighbor = selectedTopics[(blueprints.length + 1) % selectedTopics.length];
+    const focusTopics = topic === neighbor ? [topic] : [topic, neighbor];
+    add(
+      isCommonSense ? (blueprints.length % 6 === 5 ? 'fill_blank' : 'single_choice') : 'mixed',
+      focusTopics,
+      isCommonSense ? '补足覆盖并保持生活化、灵活化。' : '补足整体覆盖并增加综合度。',
+    );
+  }
+
+  return blueprints.slice(0, params.count);
 }
 
 export async function createSimilarQuestions(params: {

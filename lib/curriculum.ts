@@ -11,7 +11,7 @@ export type SubjectConfig = {
 };
 
 export const CURRICULUM = {
-  region: '中国江苏省南京市',
+  region: '江苏省南京市',
   grade: '初三',
   editionHint: '物理当前默认按苏教版与南京地区中考风格命题，后续可继续补充其他学科教材版本。',
   subjects: {
