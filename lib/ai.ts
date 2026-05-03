@@ -15,6 +15,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const MODEL_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS || 60000);
+const MODEL_MAX_TIMEOUT_MS = Number(process.env.OPENAI_MAX_TIMEOUT_MS || 120000);
 
 export function getAiConfig() {
   return {
@@ -36,19 +37,16 @@ export async function createQuestions(params: {
 }) {
   ensureConfigured();
   const coveragePlan = buildCoveragePlan(params);
-
   const system = buildGenerationSystemPrompt(params.subject);
+  const timeoutMs = getModelTimeoutMs(params);
 
-  const user = {
-    ...params,
-    output_schema: {
-      questions: [buildQuestionSchema(params.subject)],
-    },
-    rules: buildGenerationRules(params),
-    question_blueprint: coveragePlan,
-  };
-
-  return await callModelAndParse(system, JSON.stringify(user));
+  try {
+    const user = buildGenerateUserPayload(params, coveragePlan);
+    return await callModelAndParse(system, JSON.stringify(user), timeoutMs);
+  } catch (error) {
+    if (!shouldFallbackToSplitGeneration(params, error)) throw error;
+    return await createQuestionsWithSplitFallback(params, system, coveragePlan, timeoutMs);
+  }
 }
 
 type CoverageBlueprintItem = {
@@ -336,6 +334,140 @@ function buildChemistryCoveragePlan(selectedTopics: string[], count: number) {
   return blueprints.slice(0, count);
 }
 
+function compressBlueprintForPrompt(blueprints: CoverageBlueprintItem[], subject: string) {
+  return blueprints.map((item) => ({
+    no: item.no,
+    preferredType: item.preferredType,
+    focusTopics: item.focusTopics,
+    ...(subject === '化学'
+      ? { intent: item.intent.replace(/，至少包含物质性质、现象或转化线索。/g, '').replace(/南京初中化学推断题高频考点强化，突出检验、鉴别和转化关系。/g, '高频考点强化').replace(/补足推断题覆盖，保持初中范围内的综合度。/g, '补足覆盖') }
+      : { intent: item.intent }),
+  }));
+}
+
+function buildGenerateUserPayload(
+  params: {
+    subject: string;
+    topic: string;
+    topics?: string[];
+    count: number;
+    difficulty: string;
+    region: string;
+    grade: string;
+    edition: string;
+    mode?: string;
+  },
+  coveragePlan: CoverageBlueprintItem[],
+  extras?: {
+    count?: number;
+    questionBlueprint?: CoverageBlueprintItem[];
+    additionalRules?: string[];
+    usedQuestionSignatures?: string[];
+  },
+) {
+  return {
+    ...params,
+    count: extras?.count ?? params.count,
+    output_schema: {
+      questions: [buildQuestionSchema(params.subject)],
+    },
+    rules: [
+      ...buildGenerationRules(params),
+      ...(extras?.additionalRules || []),
+      ...(extras?.usedQuestionSignatures?.length
+        ? [
+            `以下题目特征已经生成过，新的题目不得与它们重复，也不得只换说法重复同一种推断链：${extras.usedQuestionSignatures.join(' || ')}`,
+          ]
+        : []),
+    ],
+    question_blueprint: compressBlueprintForPrompt(extras?.questionBlueprint || coveragePlan, params.subject),
+  };
+}
+
+function shouldFallbackToSplitGeneration(params: { subject: string; count: number }, error: unknown) {
+  if (params.subject !== '化学') return false;
+  if (params.count < 15) return false;
+  const message = error instanceof Error ? error.message : String(error || '');
+  return /超时|格式错误|生成失败|可用内容/.test(message);
+}
+
+async function createQuestionsWithSplitFallback(
+  params: {
+    subject: string;
+    topic: string;
+    topics?: string[];
+    count: number;
+    difficulty: string;
+    region: string;
+    grade: string;
+    edition: string;
+    mode?: string;
+  },
+  system: string,
+  coveragePlan: CoverageBlueprintItem[],
+  timeoutMs: number,
+) {
+  const firstCount = Math.ceil(params.count / 2);
+  const secondCount = params.count - firstCount;
+  const firstBlueprint = coveragePlan.slice(0, firstCount);
+  const secondBlueprint = coveragePlan.slice(firstCount);
+
+  const firstBatch = await callModelAndParse(
+    system,
+    JSON.stringify(buildGenerateUserPayload(params, coveragePlan, {
+      count: firstCount,
+      questionBlueprint: firstBlueprint,
+      additionalRules: ['这是第一批题目，请正常生成。'],
+    })),
+    timeoutMs,
+  );
+
+  const secondBatch = secondCount > 0
+    ? await callModelAndParse(
+        system,
+        JSON.stringify(buildGenerateUserPayload(params, coveragePlan, {
+          count: secondCount,
+          questionBlueprint: secondBlueprint,
+          additionalRules: ['这是第二批题目，必须与第一批明显不同，避免重复题干、重复物质组合、重复推断链。'],
+          usedQuestionSignatures: firstBatch.questions.map(buildQuestionSignatureForPrompt),
+        })),
+        timeoutMs,
+      )
+    : { questions: [] as GeneratedQuestion[] };
+
+  const merged = dedupeQuestions([...firstBatch.questions, ...secondBatch.questions], params.count);
+  if (merged.length >= params.count) {
+    return { questions: merged.slice(0, params.count) };
+  }
+
+  const refillBlueprint = coveragePlan.slice(merged.length, params.count);
+  const refill = await callModelAndParse(
+    system,
+    JSON.stringify(buildGenerateUserPayload(params, coveragePlan, {
+      count: params.count - merged.length,
+      questionBlueprint: refillBlueprint,
+      additionalRules: ['前面已有部分题目，请只补生成缺失且不重复的新题。'],
+      usedQuestionSignatures: merged.map(buildQuestionSignatureForPrompt),
+    })),
+    timeoutMs,
+  );
+
+  return {
+    questions: dedupeQuestions([...merged, ...refill.questions], params.count).slice(0, params.count),
+  };
+}
+
+function getModelTimeoutMs(params: { subject: string; count: number; difficulty: string }) {
+  let timeoutMs = MODEL_TIMEOUT_MS;
+
+  if (params.count >= 15) timeoutMs += 15000;
+  if (params.count >= 20) timeoutMs += 15000;
+  if (params.difficulty === '冲刺') timeoutMs += 15000;
+  if (params.subject === '化学') timeoutMs += 10000;
+
+  return Math.min(timeoutMs, MODEL_MAX_TIMEOUT_MS);
+}
+
 export async function createSimilarQuestions(params: {
   subject: string;
   region: string;
@@ -408,13 +540,13 @@ function ensureConfigured() {
   }
 }
 
-async function callModelAndParse(system: string, user: string) {
-  const first = await callModel(system, user);
+async function callModelAndParse(system: string, user: string, timeoutMs = MODEL_TIMEOUT_MS) {
+  const first = await callModel(system, user, timeoutMs);
   try {
     return parseQuestions(first);
   } catch {
     const retryUser = `${user}\n\n请特别注意：上一次返回的 JSON 格式不正确。这一次只能返回可直接解析的 JSON，不要添加任何解释。`;
-    const second = await callModel(system, retryUser);
+    const second = await callModel(system, retryUser, timeoutMs);
     try {
       return parseQuestions(second);
     } catch {
@@ -423,7 +555,7 @@ async function callModelAndParse(system: string, user: string) {
   }
 }
 
-async function callModel(system: string, user: string) {
+async function callModel(system: string, user: string, timeoutMs = MODEL_TIMEOUT_MS) {
   const mergedPrompt = [
     '你必须遵守以下出题要求。',
     '',
@@ -437,7 +569,7 @@ async function callModel(system: string, user: string) {
   ].join('\n');
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
@@ -466,7 +598,7 @@ async function callModel(system: string, user: string) {
     return content;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`AI 生成超时（>${Math.round(MODEL_TIMEOUT_MS / 1000)}秒），请重试或减少题量。`);
+      throw new Error(`AI 生成超时（>${Math.round(timeoutMs / 1000)}秒），请重试或减少题量。`);
     }
     throw error;
   } finally {
@@ -499,6 +631,34 @@ function parseQuestions(text: string) {
       points: Array.isArray(q.points) ? q.points : [],
     })),
   };
+}
+
+function buildQuestionSignatureForPrompt(question: GeneratedQuestion) {
+  const points = Array.isArray(question.points) ? question.points.join('、') : '';
+  return `${points}｜${normalizeForSimilarity(question.stem).slice(0, 80)}｜${normalizeForSimilarity(question.answer).slice(0, 40)}`;
+}
+
+function normalizeForSimilarity(value: string) {
+  return String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[\s\u3000]+/g, '')
+    .replace(/[，。；：、“”‘’（）()【】\[\],.!?;:'"\-]/g, '')
+    .toLowerCase();
+}
+
+function dedupeQuestions(questions: GeneratedQuestion[], targetCount: number) {
+  const seen = new Set<string>();
+  const result: GeneratedQuestion[] = [];
+
+  for (const question of questions) {
+    const signature = buildQuestionSignatureForPrompt(question);
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    result.push(question);
+    if (result.length >= targetCount) break;
+  }
+
+  return result;
 }
 
 function buildJsonCandidates(text: string) {
