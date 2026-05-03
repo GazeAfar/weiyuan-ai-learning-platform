@@ -15,7 +15,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const MODEL_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS || 60000);
-const MODEL_MAX_TIMEOUT_MS = Number(process.env.OPENAI_MAX_TIMEOUT_MS || 120000);
+const MODEL_MAX_TIMEOUT_MS = Number(process.env.OPENAI_MAX_TIMEOUT_MS || 180000);
 
 export function getAiConfig() {
   return {
@@ -460,10 +460,19 @@ async function createQuestionsWithSplitFallback(
 function getModelTimeoutMs(params: { subject: string; count: number; difficulty: string }) {
   let timeoutMs = MODEL_TIMEOUT_MS;
 
+  if (params.subject === '化学') {
+    timeoutMs += 20000;
+    if (params.count >= 10) timeoutMs += 10000;
+    if (params.count >= 15) timeoutMs += 15000;
+    if (params.count >= 20) timeoutMs += 25000;
+    if (params.difficulty === '提升') timeoutMs += 10000;
+    if (params.difficulty === '冲刺') timeoutMs += 20000;
+    return Math.min(timeoutMs, MODEL_MAX_TIMEOUT_MS);
+  }
+
   if (params.count >= 15) timeoutMs += 15000;
   if (params.count >= 20) timeoutMs += 15000;
   if (params.difficulty === '冲刺') timeoutMs += 15000;
-  if (params.subject === '化学') timeoutMs += 10000;
 
   return Math.min(timeoutMs, MODEL_MAX_TIMEOUT_MS);
 }
