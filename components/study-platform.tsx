@@ -560,7 +560,6 @@ function buildPaperHtml(questions: Question[], meta: Record<string, string | num
     <section class="print-question ${getPrintQuestionClass(question.type)}">
       <h3>${index + 1}. ${escapeHtml(question.stem)}</h3>
       ${question.options?.length ? `<ul class="option-list">${question.options.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
-      <p class="meta">题型：${escapeHtml(labelType(question.type))}　知识点：${escapeHtml(question.topic)}</p>
       ${renderOfflineAnswerArea(question.type)}
     </section>
   `).join('');
@@ -572,15 +571,13 @@ function buildAnswerHtml(questions: Question[], meta: Record<string, string | nu
   const body = questions.map((question, index) => `
     <section class="print-question answer-sheet ${getPrintQuestionClass(question.type)}">
       <h3>${index + 1}. ${escapeHtml(question.stem)}</h3>
-      <p class="meta">题型：${escapeHtml(labelType(question.type))}　知识点：${escapeHtml(question.topic)}</p>
+      ${question.options?.length ? `<ul class="option-list">${question.options.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
       <p><strong>标准答案：</strong>${escapeHtml(question.answer || '未提供')}</p>
       <p><strong>解析：</strong>${escapeHtml(question.explanation || '未提供')}</p>
     </section>
   `).join('');
 
   return buildPrintDocument('微远AI学习平台 · 答案解析页', meta, `<div class="print-sheet answer-mode">${body}</div>`);
-
-  return buildPrintDocument('微远AI学习平台 · 答案解析页', meta, body);
 }
 
 function buildPrintDocument(title: string, meta: Record<string, string | number> | null, body: string) {
