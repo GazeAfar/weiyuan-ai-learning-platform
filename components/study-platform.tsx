@@ -557,9 +557,9 @@ export function StudyPlatform() {
 
 function buildPaperHtml(questions: Question[], meta: Record<string, string | number> | null) {
   const body = questions.map((question, index) => `
-    <section class="print-question">
+    <section class="print-question ${getPrintQuestionClass(question.type)}">
       <h3>${index + 1}. ${escapeHtml(question.stem)}</h3>
-      ${question.options?.length ? `<ul>${question.options.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+      ${question.options?.length ? `<ul class="option-list">${question.options.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
       <p class="meta">题型：${escapeHtml(labelType(question.type))}　知识点：${escapeHtml(question.topic)}</p>
       ${renderOfflineAnswerArea(question.type)}
     </section>
@@ -570,7 +570,7 @@ function buildPaperHtml(questions: Question[], meta: Record<string, string | num
 
 function buildAnswerHtml(questions: Question[], meta: Record<string, string | number> | null) {
   const body = questions.map((question, index) => `
-    <section class="print-question answer-sheet">
+    <section class="print-question answer-sheet ${getPrintQuestionClass(question.type)}">
       <h3>${index + 1}. ${escapeHtml(question.stem)}</h3>
       <p class="meta">题型：${escapeHtml(labelType(question.type))}　知识点：${escapeHtml(question.topic)}</p>
       <p><strong>标准答案：</strong>${escapeHtml(question.answer || '未提供')}</p>
@@ -588,12 +588,19 @@ function buildPrintDocument(title: string, meta: Record<string, string | number>
       <meta charset="utf-8" />
       <title>${title}</title>
       <style>
-        body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111;padding:24px;line-height:1.7}
-        h1{font-size:26px;margin-bottom:8px} h2{font-size:14px;color:#666;font-weight:normal;margin-top:0}
-        .print-question{margin:20px 0;padding-bottom:18px;border-bottom:1px dashed #bbb;page-break-inside:avoid}
-        .meta{font-size:12px;color:#666}.blank{height:90px;border-bottom:1px solid #bbb;margin-top:10px}
-        .blank.tall{height:180px}.blank.drawing{height:220px;border:1px solid #bbb}.hint{font-size:12px;color:#666}
-        ul{padding-left:20px}.answer-sheet p{margin:8px 0} @media print{body{padding:0 10mm}}
+        @page{size:A4;margin:10mm}
+        *{box-sizing:border-box}
+        body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#111;padding:14px;line-height:1.5;font-size:13px}
+        h1{font-size:22px;margin:0 0 6px} h2{font-size:12px;color:#666;font-weight:normal;margin:0 0 10px}
+        h3{font-size:15px;line-height:1.45;margin:0 0 6px}
+        .print-question{margin:10px 0;padding-bottom:10px;border-bottom:1px dashed #bbb;page-break-inside:avoid;break-inside:avoid}
+        .print-question.compact{margin:8px 0;padding-bottom:8px}
+        .meta{font-size:11px;color:#666;margin:6px 0 0}.blank{height:64px;border-bottom:1px solid #bbb;margin-top:8px}
+        .blank.tall{height:118px}.blank.drawing{height:150px;border:1px solid #bbb}.hint{font-size:11px;color:#666;margin:6px 0 0}
+        .option-list{padding-left:18px;margin:6px 0 0;column-count:2;column-gap:20px}
+        .option-list li{margin-bottom:4px;break-inside:avoid}
+        .answer-sheet p{margin:6px 0}
+        @media print{body{padding:0}.print-question{margin:8px 0;padding-bottom:8px}}
       </style>
     </head>
     <body>
@@ -609,6 +616,11 @@ function renderOfflineAnswerArea(type: string) {
   if (type === 'experiment_textbook' || type === 'experiment_innovative') return '<p class="hint">请在线下完成实验分析作答。</p><div class="blank tall"></div>';
   if (type === 'calculation' || type === 'short_answer') return '<div class="blank tall"></div>';
   if (type === 'fill_blank') return '<div class="blank"></div>';
+  return '';
+}
+
+function getPrintQuestionClass(type: string) {
+  if (type === 'single_choice' || type === 'fill_blank') return 'compact';
   return '';
 }
 
